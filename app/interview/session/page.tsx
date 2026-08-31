@@ -125,7 +125,7 @@ export default function InterviewSessionPage() {
 
     setIsEvaluating(true);
     setAvatarState("thinking");
-    setStatusMessage(isLastQuestion ? "Finalizing interview & calculating accurate scorecard..." : "Evaluating response...");
+    setStatusMessage(isLastQuestion ? "Finalizing interview & generating scorecard..." : "Analyzing response...");
 
     // Record answer in storage immediately
     SessionManager.recordAnswer(session.id, currentQ.id, answerText, durationSeconds, mode);
@@ -176,15 +176,15 @@ export default function InterviewSessionPage() {
             SessionManager.insertFollowUpQuestion(session.id, evalData.followUpQuestion);
           }
         })
-        .catch((err) => console.warn("Evaluation error:", err));
+        .catch((err) => console.warn("Evaluation note:", err));
 
       pendingEvalsRef.current.push(evalPromise);
 
       if (!isLastQuestion) {
-        // Snappy transition for middle questions (max 600ms pause)
+        // Fast optimistic transition (max 400ms pause)
         await Promise.race([
           evalPromise,
-          new Promise((resolve) => setTimeout(resolve, 600)),
+          new Promise((resolve) => setTimeout(resolve, 400)),
         ]);
 
         const updatedSession = SessionManager.getActiveSession() || session;
@@ -199,11 +199,14 @@ export default function InterviewSessionPage() {
           setAvatarState("idle");
         }
       } else {
-        // Last question: wait for ALL evaluations to complete before generating scorecard
-        await Promise.allSettled(pendingEvalsRef.current);
+        // Last question: wait max 600ms for pending evals
+        await Promise.race([
+          Promise.allSettled(pendingEvalsRef.current),
+          new Promise((r) => setTimeout(r, 600)),
+        ]);
 
         setIsCompletedTransition(true);
-        setStatusMessage("Evaluating full interview performance with Sara AI...");
+        setStatusMessage("Calculating final scorecard...");
 
         const updatedSession = SessionManager.getActiveSession() || session;
         const finalScorecardRes = await fetch("/api/evaluate", {

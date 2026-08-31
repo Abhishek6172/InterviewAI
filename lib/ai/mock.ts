@@ -11,8 +11,6 @@ import { InterviewQuestion } from "@/types/interview";
 
 export class MockAIService implements AIService {
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
-    await new Promise((r) => setTimeout(r, 350));
-
     const role = req.role.toLowerCase();
     const hasResume = Boolean(req.resumeText && req.resumeText.trim().length > 0);
 
@@ -149,8 +147,6 @@ export class MockAIService implements AIService {
   }
 
   async evaluateAnswer(req: EvaluateAnswerRequest): Promise<EvaluateAnswerResponse> {
-    await new Promise((r) => setTimeout(r, 400));
-
     const text = req.userAnswer.trim();
     const words = text.split(/\s+/).filter(Boolean);
     const wordCount = words.length;
@@ -259,8 +255,6 @@ export class MockAIService implements AIService {
   }
 
   async generateScorecard(req: GenerateScorecardRequest): Promise<GenerateScorecardResponse> {
-    await new Promise((r) => setTimeout(r, 450));
-
     const questions = req.questions || [];
     const evaluations = req.evaluations || {};
     const answers = req.answers || {};

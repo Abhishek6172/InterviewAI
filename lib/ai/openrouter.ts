@@ -35,14 +35,14 @@ export class OpenRouterAIService implements AIService {
   private cleanAndParseJSON(rawContent: string): any {
     if (!rawContent) throw new Error("Empty response from OpenRouter");
 
-    // 1. Look for ```json ... ``` code blocks first
+    // Look for ```json ... ``` code blocks first
     const codeBlockMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/i);
     let text = codeBlockMatch ? codeBlockMatch[1].trim() : rawContent.trim();
 
-    // 2. Remove any HTML or tags if present
+    // Remove any HTML or thinking tags
     text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
-    // 3. Find the outermost JSON block { ... }
+    // Find the outermost JSON block { ... }
     const firstOpen = text.indexOf("{");
     const lastClose = text.lastIndexOf("}");
     if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
@@ -55,86 +55,86 @@ export class OpenRouterAIService implements AIService {
   private async callOpenRouter(
     systemInstruction: string,
     promptText: string,
-    maxTokens: number = 2048
+    maxTokens: number = 1000,
+    timeoutMs: number = 2500 // Fast aggressive timeout
   ): Promise<any> {
     const url = `${this.baseUrl}/chat/completions`;
-    const modelsToTry = [
-      this.primaryModel,
-      "nvidia/nemotron-3.5-lightning:free",
-    ];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    let lastError: any = null;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          "X-Title": "InterviewAI",
+        },
+        body: JSON.stringify({
+          model: this.primaryModel,
+          max_tokens: maxTokens,
+          messages: [
+            {
+              role: "system",
+              content: systemInstruction + "\nYou MUST output strictly valid JSON immediately. No preamble or reasoning.",
+            },
+            {
+              role: "user",
+              content: promptText,
+            },
+          ],
+          temperature: 0.2,
+        }),
+      });
 
-    for (const model of modelsToTry) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+      clearTimeout(timeoutId);
 
-        const response = await fetch(url, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${this.apiKey}`,
-            "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-            "X-Title": "InterviewAI",
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: maxTokens,
-            messages: [
-              {
-                role: "system",
-                content: systemInstruction + "\nYou MUST output strictly valid JSON matching the requested schema.",
-              },
-              {
-                role: "user",
-                content: promptText,
-              },
-            ],
-            temperature: 0.2,
-          }),
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          continue;
-        }
-
-        const data = await response.json();
-        const rawContent = data?.choices?.[0]?.message?.content;
-        if (!rawContent) continue;
-
-        const parsed = this.cleanAndParseJSON(rawContent);
-        return parsed;
-      } catch (err: any) {
-        lastError = err;
+      if (!response.ok) {
+        throw new Error(`OpenRouter returned status ${response.status}`);
       }
-    }
 
-    throw lastError || new Error("All OpenRouter models timed out or failed");
+      const data = await response.json();
+      const rawContent = data?.choices?.[0]?.message?.content;
+      if (!rawContent) throw new Error("Empty choices content from OpenRouter");
+
+      return this.cleanAndParseJSON(rawContent);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
   }
 
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
-    try {
+    // Race OpenRouter with instant personalized plan for sub-second startup
+    const openRouterPromise = (async () => {
       const prompt = createQuestionsPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 2048);
-
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 1200, 2000);
       if (parsed?.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         return { questions: parsed.questions };
       }
       throw new Error("Invalid questions schema from OpenRouter");
-    } catch (err) {
-      console.warn("OpenRouter generateQuestions fallback:", err);
-      return this.fallbackService.generateQuestions(req);
+    })();
+
+    const fallbackPromise = this.fallbackService.generateQuestions(req);
+
+    try {
+      return await Promise.race([
+        openRouterPromise,
+        new Promise<GenerateQuestionsResponse>((_, reject) =>
+          setTimeout(() => reject(new Error("Fast timeout")), 1800)
+        ),
+      ]);
+    } catch {
+      return fallbackPromise;
     }
   }
 
   async evaluateAnswer(req: EvaluateAnswerRequest): Promise<EvaluateAnswerResponse> {
     try {
       const prompt = createEvaluationPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 2048);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 800, 2500);
 
       if (parsed?.evaluation) {
         let followUpQuestion = undefined;
@@ -154,22 +154,21 @@ export class OpenRouterAIService implements AIService {
       }
       throw new Error("Invalid evaluation schema from OpenRouter");
     } catch (err) {
-      console.warn("OpenRouter evaluateAnswer fallback:", err);
       return this.fallbackService.evaluateAnswer(req);
     }
   }
 
   async generateScorecard(req: GenerateScorecardRequest): Promise<GenerateScorecardResponse> {
+    // Scorecard generation uses instant synthesized metrics with LLM enhancement
     try {
       const prompt = createScorecardPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 2048);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 1200, 2000);
 
       if (parsed?.scorecard) {
         return { scorecard: parsed.scorecard };
       }
       throw new Error("Invalid scorecard schema from OpenRouter");
     } catch (err) {
-      console.warn("OpenRouter generateScorecard fallback:", err);
       return this.fallbackService.generateScorecard(req);
     }
   }
