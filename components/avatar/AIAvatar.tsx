@@ -17,7 +17,7 @@ export interface AIAvatarProps {
 
 export function AIAvatar({
   state = "idle",
-  interviewerName = "Adya",
+  interviewerName = "Sara",
   roleTitle = "Senior AI Interviewer",
   caption,
   className,

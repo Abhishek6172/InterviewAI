@@ -150,7 +150,7 @@ export default function AnalyticsDashboardPage() {
 
         <Card className="p-5 glass-panel flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground block">Adya AI Realism</span>
+            <span className="text-xs text-muted-foreground block">Sara AI Realism</span>
             <div className="flex items-center gap-1">
               <span className="text-2xl font-bold text-purple-400">{avgRealism}</span>
               <span className="text-xs text-slate-400">/ 5</span>

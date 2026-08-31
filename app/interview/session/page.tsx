@@ -203,7 +203,7 @@ export default function InterviewSessionPage() {
         await Promise.allSettled(pendingEvalsRef.current);
 
         setIsCompletedTransition(true);
-        setStatusMessage("Evaluating full interview performance with Adya AI...");
+        setStatusMessage("Evaluating full interview performance with Sara AI...");
 
         const updatedSession = SessionManager.getActiveSession() || session;
         const finalScorecardRes = await fetch("/api/evaluate", {
@@ -281,11 +281,11 @@ export default function InterviewSessionPage() {
 
       {/* Main Centered Stage */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-4 sm:py-6 flex flex-col items-center justify-start space-y-4">
-        {/* Prominent AI Avatar (Named Adya) */}
+        {/* Prominent AI Avatar (Named Sara) */}
         <div className="w-full flex justify-center shrink-0">
           <AIAvatar
             state={avatarState}
-            interviewerName="Adya"
+            interviewerName="Sara"
             roleTitle={`${session.options.role} Interviewer`}
             className="p-1 sm:p-2"
           />

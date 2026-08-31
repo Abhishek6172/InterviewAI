@@ -106,7 +106,7 @@ export function FeedbackModal({ sessionId, onFeedbackSubmitted }: FeedbackModalP
             Thank you for your feedback{name ? `, ${name}` : ""}!
           </h4>
           <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-            Your responses have been recorded and synced to help train Adya and shape our next interview features.
+            Your responses have been recorded and synced to help train Sara and shape our next interview features.
           </p>
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-300">
             <Sparkles className="w-3.5 h-3.5" />
@@ -125,7 +125,7 @@ export function FeedbackModal({ sessionId, onFeedbackSubmitted }: FeedbackModalP
           Candidate Feedback & Evaluation
         </div>
         <CardTitle className="text-lg sm:text-xl font-bold text-white">
-          How was your experience with Adya?
+          How was your experience with Sara?
         </CardTitle>
         <CardDescription className="text-xs text-slate-400 max-w-md mx-auto">
           Your feedback directly informs our scoring accuracy, voice models, and new domain questions.
@@ -192,12 +192,12 @@ export function FeedbackModal({ sessionId, onFeedbackSubmitted }: FeedbackModalP
             </div>
           </div>
 
-          {/* Dimension B: Adya AI Realism */}
+          {/* Dimension B: Sara AI Realism */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-white/5">
             <div>
               <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                 <BrainCircuit className="w-3.5 h-3.5 text-purple-400" />
-                2. Adya Realism & Question Quality
+                2. Sara Realism & Question Quality
               </span>
               <span className="text-[11px] text-slate-400">Did the questions feel authentic to real industry interviews?</span>
             </div>
@@ -283,7 +283,7 @@ export function FeedbackModal({ sessionId, onFeedbackSubmitted }: FeedbackModalP
         {/* 4. What did you like most? */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-200 block">
-            5. What did you like most about Adya? (Optional)
+            5. What did you like most about Sara? (Optional)
           </label>
           <input
             type="text"
@@ -302,13 +302,13 @@ export function FeedbackModal({ sessionId, onFeedbackSubmitted }: FeedbackModalP
           <textarea
             value={improvements}
             onChange={(e) => setImprovements(e.target.value)}
-            placeholder="e.g. Live code editor, video recording playback, company-specific question packs..."
+            placeholder="e.g. Deeper follow-up questions, video avatar, specific coding challenges..."
             rows={2}
             className="w-full rounded-xl bg-white/5 border border-white/10 p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
           />
         </div>
 
-        {/* 6. Would you practice with Adya again? */}
+        {/* 6. Would you practice with Sara again? */}
         <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/10">
           <span className="text-xs text-slate-300 font-medium">Would you practice with InterviewAI again?</span>
           <div className="flex gap-1.5">
