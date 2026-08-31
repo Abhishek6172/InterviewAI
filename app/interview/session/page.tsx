@@ -264,38 +264,43 @@ export default function InterviewSessionPage() {
 
   return (
     <div className="flex flex-col min-h-screen w-full">
-      {/* Header Bar */}
-      <InterviewHeader
-        role={session.options.role}
-        difficulty={session.options.difficulty}
-        currentQuestion={session.currentQuestionIndex + 1}
-        totalQuestions={session.questions.length}
-        onEndInterview={handleEndInterview}
-      />
-
-      {/* Main Interactive Stage (Mobile-Optimized Padding) */}
-      <div className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-8 flex flex-col items-center justify-between space-y-4 sm:space-y-6">
-        {/* Prominent AI Avatar */}
-        <AIAvatar
-          state={avatarState}
-          interviewerName="Alex"
-          roleTitle={`${session.options.role} Interviewer`}
-          caption={captionText}
-          className="p-2 sm:p-6"
+      {/* Sticky Header Bar */}
+      <div className="sticky top-0 z-30 bg-[#090a10]/80 backdrop-blur-md border-b border-white/5">
+        <InterviewHeader
+          role={session.options.role}
+          difficulty={session.options.difficulty}
+          currentQuestion={session.currentQuestionIndex + 1}
+          totalQuestions={session.questions.length}
+          onEndInterview={handleEndInterview}
         />
+      </div>
 
-        {/* Current Question */}
-        {currentQ && !isCompletedTransition && (
-          <QuestionCard
-            question={currentQ}
-            onReplayAudio={() => speakQuestion(currentQ.question)}
-            isSpeaking={avatarState === "speaking"}
+      {/* Main Centered Stage */}
+      <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-4 sm:py-6 flex flex-col items-center justify-start space-y-4">
+        {/* Prominent AI Avatar (Always Centered & Visible) */}
+        <div className="w-full flex justify-center shrink-0">
+          <AIAvatar
+            state={avatarState}
+            interviewerName="Alex"
+            roleTitle={`${session.options.role} Interviewer`}
+            className="p-1 sm:p-2"
           />
+        </div>
+
+        {/* Current Question Card */}
+        {currentQ && !isCompletedTransition && (
+          <div className="w-full">
+            <QuestionCard
+              question={currentQ}
+              onReplayAudio={() => speakQuestion(currentQ.question)}
+              isSpeaking={avatarState === "speaking"}
+            />
+          </div>
         )}
 
         {/* Loading / Evaluating Status Overlay */}
         {(isEvaluating || isCompletedTransition) && (
-          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs animate-pulse shadow-lg">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs animate-pulse shadow-lg">
             {isCompletedTransition ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
@@ -307,7 +312,7 @@ export default function InterviewSessionPage() {
 
         {/* Input Interface */}
         {!isCompletedTransition && (
-          <div className="w-full">
+          <div className="w-full pb-6">
             <AnswerInput
               isListening={isListening}
               onToggleListening={handleToggleListening}
@@ -317,7 +322,7 @@ export default function InterviewSessionPage() {
             />
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

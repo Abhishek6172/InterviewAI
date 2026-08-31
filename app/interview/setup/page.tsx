@@ -34,6 +34,9 @@ import {
   UploadCloud,
   X,
   FileCheck,
+  Check,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -100,7 +103,8 @@ export default function InterviewSetupPage() {
   const [resumeText, setResumeText] = useState<string>("");
   const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const [isUploadingResume, setIsUploadingResume] = useState(false);
-  const [showResumeInput, setShowResumeInput] = useState(false);
+  const [showManualPaste, setShowManualPaste] = useState(false);
+  const [showTextPreview, setShowTextPreview] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,14 +135,14 @@ export default function InterviewSetupPage() {
       if (data.success && data.text) {
         setResumeText(data.text);
         setResumeFileName(file.name);
-        setShowResumeInput(true);
+        setShowManualPaste(false); // Hide the summary/textarea after file upload
       } else {
         throw new Error(data.error || "Failed to parse resume");
       }
     } catch (err: any) {
       console.error("Resume upload error:", err);
       setErrorMsg("Could not extract text from document. You can paste your resume or project details in the text box below.");
-      setShowResumeInput(true);
+      setShowManualPaste(true);
     } finally {
       setIsUploadingResume(false);
     }
@@ -147,6 +151,8 @@ export default function InterviewSetupPage() {
   const handleClearResume = () => {
     setResumeText("");
     setResumeFileName(null);
+    setShowManualPaste(false);
+    setShowTextPreview(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -204,6 +210,7 @@ export default function InterviewSetupPage() {
           experienceLevel: selectedExperience,
           questionCount,
           hasResume: Boolean(resumeText.trim()),
+          resumeFileName: resumeFileName || "none",
         },
         session.id
       );
@@ -216,10 +223,12 @@ export default function InterviewSetupPage() {
         {
           id: "q1",
           order: 1,
-          question: `Can you walk me through your background in ${finalRole} and tell me about a project you are proud of?`,
+          question: resumeText.trim()
+            ? `I reviewed your resume for ${finalRole}. Can you walk me through the architecture and your primary contributions to the main project listed on your resume?`
+            : `Can you walk me through your background in ${finalRole} and tell me about a project you are proud of?`,
           category: "introductory" as const,
           difficulty: selectedDifficulty,
-          contextHint: "Highlight your specific role, technical stack, and impact.",
+          contextHint: "Highlight your specific ownership, technical stack, and results.",
         },
         {
           id: "q2",
@@ -245,7 +254,7 @@ export default function InterviewSetupPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <div className="w-full max-w-5xl mx-auto px-4 py-8 sm:py-10 space-y-6 sm:space-y-8">
       {/* Navigation Header */}
       <div className="flex items-center justify-between">
         <Link href="/">
@@ -260,10 +269,10 @@ export default function InterviewSetupPage() {
       </div>
 
       <div className="text-center space-y-2">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
           Configure Your Mock Interview
         </h1>
-        <p className="text-sm text-slate-400 max-w-xl mx-auto">
+        <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto">
           Tailor the AI interviewer to simulate the exact position, seniority, resume projects, and style of your target company.
         </p>
       </div>
@@ -351,104 +360,159 @@ export default function InterviewSetupPage() {
         )}
       </div>
 
-      {/* 2. Resume & Project Context (New) */}
+      {/* 2. Resume & Project Context (Clean State) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-semibold text-white flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
               2
             </span>
-            Upload Resume / Project Background (Optional)
+            Upload Resume / Projects (Optional)
           </label>
           <span className="text-[11px] text-purple-300">The AI will question your actual projects</span>
         </div>
 
-        <Card className="glass-panel border-white/10 p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/5 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/25">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-xs sm:text-sm font-semibold text-white block">
-                  {resumeFileName ? resumeFileName : "Upload your resume (.pdf, .txt, .docx)"}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {resumeFileName
-                    ? `${resumeText.length} characters parsed & ready`
-                    : "The LLM will generate targeted questions referencing your past work & technologies"}
-                </span>
-              </div>
-            </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.txt,.md,.doc,.docx"
+          onChange={handleFileUpload}
+          className="hidden"
+          id="resume-upload"
+        />
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.txt,.md,.doc,.docx"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="resume-upload"
-              />
-              <label htmlFor="resume-upload" className="w-full sm:w-auto">
+        {/* Case A: Resume Attached Successfully */}
+        {resumeFileName ? (
+          <Card className="glass-panel border-emerald-500/40 bg-emerald-950/10 p-4 sm:p-5 space-y-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <FileCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white tracking-tight">{resumeFileName}</span>
+                    <Badge variant="success" className="text-[10px] px-2 py-0">
+                      ✓ Attached & Ready
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {resumeText.length} characters parsed &bull; The AI will ask questions about projects in this resume.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs border-white/10 hover:border-white/30 h-8"
+                >
+                  <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
+                  Replace
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleClearResume}
+                  className="text-xs h-8"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Remove
+                </Button>
+              </div>
+            </div>
+
+            {/* Collapsible text preview */}
+            <div className="pt-2 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => setShowTextPreview(!showTextPreview)}
+                className="text-[11px] text-purple-300 hover:text-purple-200 flex items-center gap-1"
+              >
+                {showTextPreview ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {showTextPreview ? "Hide parsed resume content" : "View parsed resume content"}
+              </button>
+
+              {showTextPreview && (
+                <div className="mt-2 p-3 rounded-xl bg-black/40 border border-white/10 text-[11px] text-slate-300 font-mono max-h-36 overflow-y-auto leading-relaxed whitespace-pre-wrap">
+                  {resumeText}
+                </div>
+              )}
+            </div>
+          </Card>
+        ) : (
+          /* Case B: No Resume Attached Yet */
+          <Card className="glass-panel border-white/10 p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/25">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-white block">
+                    Upload your resume document
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Supports .pdf, .txt, .docx &bull; The AI will formulate questions from your work experience
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="glow"
+                  size="sm"
                   disabled={isUploadingResume}
-                  className="w-full sm:w-auto gap-2 text-xs border-purple-500/30 hover:border-purple-500/60 cursor-pointer"
+                  className="w-full sm:w-auto gap-2 text-xs h-9 px-4 cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {isUploadingResume ? (
                     <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
-                      Parsing Document...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Parsing Resume...
                     </>
                   ) : (
                     <>
-                      <UploadCloud className="w-3.5 h-3.5 text-purple-400" />
-                      {resumeFileName ? "Replace File" : "Choose Resume File"}
+                      <UploadCloud className="w-4 h-4" />
+                      Attach Resume (.pdf / .docx)
                     </>
                   )}
                 </Button>
-              </label>
 
-              {resumeText && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={handleClearResume}
-                  className="text-xs text-red-400 hover:text-red-300"
+                  onClick={() => setShowManualPaste(!showManualPaste)}
+                  className="text-xs text-slate-400 hover:text-white whitespace-nowrap h-9"
                 >
-                  <X className="w-3.5 h-3.5 mr-1" />
-                  Clear
+                  {showManualPaste ? "Cancel" : "Or Paste Text"}
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
 
-          {/* Editable Resume Text Area */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-300">
-                Or paste your resume, project details, or LinkedIn summary:
-              </span>
-              {resumeText && (
-                <Badge variant="success" className="text-[10px] gap-1">
-                  <FileCheck className="w-3 h-3" /> Resume Active
-                </Badge>
-              )}
-            </div>
-            <textarea
-              value={resumeText}
-              onChange={(e) => setResumeText(e.target.value)}
-              placeholder="Paste work experience, past tech projects, internships, or achievements here (e.g., 'Built an e-commerce microservice with Node.js, Redis and PostgreSQL, reducing latency by 40%...')"
-              rows={showResumeInput || resumeText ? 4 : 2}
-              className="w-full rounded-xl bg-white/5 border border-white/10 p-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-purple-500 font-mono transition-all"
-            />
-          </div>
-        </Card>
+            {/* Manual text paste fallback area (only shown if toggled) */}
+            {showManualPaste && (
+              <div className="space-y-2 pt-3 border-t border-white/5 animate-in fade-in slide-in-from-top-2">
+                <span className="text-xs font-semibold text-slate-300 block">
+                  Paste your projects or background summary:
+                </span>
+                <textarea
+                  value={resumeText}
+                  onChange={(e) => setResumeText(e.target.value)}
+                  placeholder="e.g. 'Built a full-stack real-time chat app with Next.js, WebSockets, and Redis. Reduced server latency by 35%...'"
+                  rows={3}
+                  className="w-full rounded-xl bg-white/5 border border-white/10 p-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-purple-500 font-mono"
+                />
+              </div>
+            )}
+          </Card>
+        )}
       </div>
 
       {/* 3. Interview Type */}
@@ -596,7 +660,9 @@ export default function InterviewSetupPage() {
           )}
         </Button>
         <span className="text-xs text-slate-500 mt-2">
-          Powered by real-time LLM reasoning &bull; Voice & typing supported
+          {resumeFileName
+            ? `Interviewer primed with ${resumeFileName} &bull; Voice & typing supported`
+            : "Powered by real-time LLM reasoning &bull; Voice & typing supported"}
         </span>
       </div>
     </div>

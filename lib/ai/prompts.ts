@@ -6,7 +6,7 @@ You speak directly, stay focused on the candidate's target role, adapt to their 
 
 Core Operating Principles:
 1. Always remain in character as an interviewer.
-2. Ask clear, concise, and realistic interview questions tailored to the candidate's target role and resume context.
+2. If a resume is provided, you MUST directly inspect their listed projects, technologies, and work history, and tailor questions to their actual projects.
 3. NEVER answer the question for the candidate or give away the solution while interviewing.
 4. Evaluate what the candidate ACTUALLY stated:
    - If the candidate answers "I don't know", "no idea", or gives an empty/irrelevant response, score 0.0-2.5/10 and provide direct feedback on how they should have approached the unknown question.
@@ -21,9 +21,13 @@ export function createQuestionsPrompt(req: GenerateQuestionsRequest): string {
       ? `Previous Conversation Context:\n${req.conversationHistory.map((h) => `Q: ${h.questionText}\nA: ${h.userAnswer}`).join("\n")}`
       : "No previous questions.";
 
-  const resumeSection = req.resumeText && req.resumeText.trim().length > 0
-    ? `CANDIDATE'S RESUME & BACKGROUND:\n"""\n${req.resumeText.slice(0, 3000)}\n"""\n\nCRITICAL REQUIREMENT: Since the candidate provided their resume, tailor at least 2-3 questions directly to specific projects, technologies, internships, or achievements mentioned in their resume, while covering essential domain topics for a ${req.role}.`
-    : "No resume provided.";
+  const hasResume = req.resumeText && req.resumeText.trim().length > 0;
+
+  const resumeSection = hasResume
+    ? `CANDIDATE'S RESUME & PROJECTS (MANDATORY TO USE):\n"""\n${req.resumeText!.slice(0, 3500)}\n"""\n\nCRITICAL INSTRUCTION: You MUST ask questions directly referencing the candidate's actual projects, technologies, internships, or achievements extracted from the resume above.
+- Question 1 MUST explicitly name and ask about their main project/experience from the resume (e.g. "I see on your resume that you worked on [Project Name] using [Tech Stack]...").
+- Question 2 MUST ask a deep technical challenge or design decision related to their listed projects or technologies.`
+    : "No resume provided. Generate standard role questions.";
 
   return `
 Create a realistic interview plan with ${req.count} questions for a "${req.role}" interview.
@@ -37,16 +41,16 @@ ${historySnippet}
 
 Guidelines:
 1. Ensure questions logically progress:
-   - Question 1: If resume is provided, ask a targeted introductory question about their highlighted project or background. Otherwise, ask a foundational ${req.role} question.
-   - Middle questions: In-depth technical probing, scenario problem-solving, or behavioral situation (STAR method).
-   - Final questions: High-impact practical challenge or system/product trade-offs.
+   - Question 1: ${hasResume ? "Direct question referencing their specific resume project and asking them to walk through the technical architecture." : `Foundational ${req.role} introductory question.`}
+   - Question 2: ${hasResume ? "Deep-dive technical probing on the specific tools, libraries, or bottlenecks from their resume project." : "Core technical depth scenario or algorithms."}
+   - Middle/Final questions: Practical challenges, behavioral situation (STAR method), and system/product trade-offs for ${req.role}.
 2. Output strictly valid JSON matching this schema:
 {
   "questions": [
     {
       "id": "q1",
       "order": 1,
-      "question": "Concise, realistic interview question.",
+      "question": "Realistic interview question explicitly citing resume projects if provided.",
       "category": "introductory" | "technical" | "behavioral" | "problem-solving" | "system-design",
       "difficulty": "${req.difficulty}",
       "contextHint": "1-sentence hint of what an interviewer looks for",
