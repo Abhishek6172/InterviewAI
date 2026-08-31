@@ -11,18 +11,68 @@ import { InterviewQuestion } from "@/types/interview";
 
 export class MockAIService implements AIService {
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
-    await new Promise((r) => setTimeout(r, 450));
+    await new Promise((r) => setTimeout(r, 350));
 
     const role = req.role.toLowerCase();
+    const hasResume = Boolean(req.resumeText && req.resumeText.trim().length > 0);
 
     let questionBank: InterviewQuestion[] = [];
 
-    if (role.includes("frontend") || role.includes("ui") || role.includes("react")) {
+    if (hasResume) {
+      // Resume-aware questions
+      questionBank = [
+        {
+          id: `q_res_${Date.now()}_1`,
+          order: 1,
+          question: `I reviewed your resume for ${req.role}. Can you introduce yourself and walk me through the architecture and your key technical contributions to your primary project listed on your resume?`,
+          category: "introductory",
+          difficulty: req.difficulty,
+          contextHint: "Detail your specific role, technical stack, architecture decisions, and business impact.",
+          expectedTopics: ["Project Architecture", "Technical Stack", "Ownership", "Key Metrics"],
+        },
+        {
+          id: `q_res_${Date.now()}_2`,
+          order: 2,
+          question: `Looking at your project experience, what was the most difficult technical challenge or performance bottleneck you encountered, and how did you debug and resolve it?`,
+          category: "technical",
+          difficulty: req.difficulty,
+          contextHint: "Explain your diagnosis methodology, alternative solutions evaluated, and the final implementation.",
+          expectedTopics: ["Root Cause Analysis", "Debugging", "Optimization", "Trade-offs"],
+        },
+        {
+          id: `q_res_${Date.now()}_3`,
+          order: 3,
+          question: `Tell me about a time you had to adapt to changing project requirements or handle a technical disagreement with a team member while building these systems.`,
+          category: "behavioral",
+          difficulty: req.difficulty,
+          contextHint: "Use the STAR method: Situation, Task, Action, Result.",
+          expectedTopics: ["Collaboration", "Conflict Resolution", "STAR method"],
+        },
+        {
+          id: `q_res_${Date.now()}_4`,
+          order: 4,
+          question: `How did you approach automated testing, continuous integration, and edge-case validation for your applications before shipping them?`,
+          category: "problem-solving",
+          difficulty: req.difficulty,
+          contextHint: "Discuss unit vs integration tests, mocking, CI pipelines, and error handling.",
+          expectedTopics: ["Testing Strategy", "CI/CD", "Reliability"],
+        },
+        {
+          id: `q_res_${Date.now()}_5`,
+          order: 5,
+          question: `If traffic to your application increased by 10x overnight, what parts of your architecture would fail first and how would you scale them?`,
+          category: "system-design",
+          difficulty: req.difficulty,
+          contextHint: "Identify bottlenecks: database connections, caching, load balancing, or asynchronous processing.",
+          expectedTopics: ["Scaling", "Caching", "Database Bottlenecks", "Asynchronous Workers"],
+        },
+      ];
+    } else if (role.includes("frontend") || role.includes("ui") || role.includes("react")) {
       questionBank = [
         {
           id: `q_fe_${Date.now()}_1`,
           order: 1,
-          question: "Can you walk me through a challenging frontend feature you built, focusing on how you managed complex state and optimized rendering performance?",
+          question: "Can you walk me through a challenging frontend feature you built, focusing on how you managed state and optimized rendering performance?",
           category: "technical",
           difficulty: req.difficulty,
           contextHint: "Highlight state libraries, reconciliation, memoization, and bundle size.",
@@ -46,158 +96,23 @@ export class MockAIService implements AIService {
           contextHint: "Use the STAR method: Situation, Task, Action, Result with focus on proactive alignment.",
           expectedTopics: ["Communication", "Stakeholder management", "STAR method"],
         },
-        {
-          id: `q_fe_${Date.now()}_4`,
-          order: 4,
-          question: "How do you approach web accessibility (a11y) and responsive design when building complex interactive components like modals or data grids?",
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Mention ARIA labels, focus traps, keyboard navigation, and responsive CSS.",
-          expectedTopics: ["ARIA", "Keyboard navigation", "Responsive CSS"],
-        },
-        {
-          id: `q_fe_${Date.now()}_5`,
-          order: 5,
-          question: "If our client-side bundle size suddenly increased by 300KB after a sprint, how would you diagnose and resolve the regression?",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Detail bundle analyzers, tree-shaking, code-splitting, and dynamic imports.",
-          expectedTopics: ["Webpack/Vite Bundle Analyzer", "Code Splitting", "Tree Shaking"],
-        },
-      ];
-    } else if (role.includes("backend") || role.includes("distributed") || role.includes("cloud")) {
-      questionBank = [
-        {
-          id: `q_be_${Date.now()}_1`,
-          order: 1,
-          question: "Can you describe the architecture of a backend service you built, focusing on how data flows from API gateway down to storage?",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Discuss REST/gRPC endpoints, validation, service layer, and database transactions.",
-          expectedTopics: ["API Gateway", "Microservices", "Data layer", "Concurrency"],
-        },
-        {
-          id: `q_be_${Date.now()}_2`,
-          order: 2,
-          question: "How do you design database schemas and choose between relational (PostgreSQL) vs NoSQL for high-write workloads?",
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Compare ACID compliance, indexing, partitioning, and read/write scaling.",
-          expectedTopics: ["PostgreSQL", "NoSQL", "Indexing", "Partitioning"],
-        },
-        {
-          id: `q_be_${Date.now()}_3`,
-          order: 3,
-          question: "Tell me about a critical production bug or downtime you investigated. What was the root cause and how did you resolve it?",
-          category: "behavioral",
-          difficulty: req.difficulty,
-          contextHint: "Structure with Situation, Action, Post-Mortem, and preventative monitors added.",
-          expectedTopics: ["Debugging", "Post-Mortem", "Observability"],
-        },
-        {
-          id: `q_be_${Date.now()}_4`,
-          order: 4,
-          question: "How do you implement rate limiting, caching with Redis, and authentication token verification at scale?",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Discuss token bucket / leaky bucket algorithms, cache invalidation, and JWT / sessions.",
-          expectedTopics: ["Redis", "Rate Limiting", "JWT", "Cache Invalidation"],
-        },
-        {
-          id: `q_be_${Date.now()}_5`,
-          order: 5,
-          question: "What strategies do you use to ensure zero-downtime database migrations when altering large tables with millions of rows?",
-          category: "system-design",
-          difficulty: req.difficulty,
-          contextHint: "Explain expand-and-contract pattern, dual writing, and backfilling.",
-          expectedTopics: ["Zero-downtime migrations", "Dual writing", "Expand-and-contract"],
-        },
-      ];
-    } else if (role.includes("product") || role.includes("pm")) {
-      questionBank = [
-        {
-          id: `q_pm_${Date.now()}_1`,
-          order: 1,
-          question: "How do you evaluate and prioritize competing feature requests from high-value enterprise customers versus growth features for free-tier users?",
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Use frameworks like RICE or Kano, business alignment, and data-backed rationale.",
-          expectedTopics: ["RICE Framework", "Customer segmentation", "Business impact"],
-        },
-        {
-          id: `q_pm_${Date.now()}_2`,
-          order: 2,
-          question: "Imagine our user onboarding completion rate dropped by 20% week-over-week. Walk me step-by-step through how you would investigate the root cause.",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Segment funnels by device, cohort, release timing, and user journey drop-offs.",
-          expectedTopics: ["Funnel analytics", "Cohort analysis", "Hypothesis testing"],
-        },
-        {
-          id: `q_pm_${Date.now()}_3`,
-          order: 3,
-          question: "Tell me about a time you had to say 'no' to a key stakeholder or executive. How did you manage the conversation?",
-          category: "behavioral",
-          difficulty: req.difficulty,
-          contextHint: "Highlight data-driven empathy, alternative proposals, and alignment on shared north star metrics.",
-          expectedTopics: ["Stakeholder management", "Data storytelling", "Conflict resolution"],
-        },
-        {
-          id: `q_pm_${Date.now()}_4`,
-          order: 4,
-          question: "How do you define and track the North Star Metric and secondary health guardrail metrics for a new product launch?",
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Explain the connection between customer value, retention, and guardrail metrics.",
-          expectedTopics: ["North Star Metric", "Retention", "Guardrail metrics"],
-        },
-      ];
-    } else if (role.includes("data") || role.includes("analyst") || role.includes("scientist")) {
-      questionBank = [
-        {
-          id: `q_da_${Date.now()}_1`,
-          order: 1,
-          question: "Can you walk me through a data analysis project where your findings directly influenced a business or engineering decision?",
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Focus on problem framing, SQL/Python methodology, key insight, and measurable outcome.",
-          expectedTopics: ["SQL", "Business Impact", "Insights Communication"],
-        },
-        {
-          id: `q_da_${Date.now()}_2`,
-          order: 2,
-          question: "How do you structure an A/B test when sample sizes are small or variance is high? What statistical pitfalls do you watch out for?",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Discuss statistical power, p-values, p-hacking, and minimum detectable effect (MDE).",
-          expectedTopics: ["A/B Testing", "Statistical Significance", "Sample Size"],
-        },
-        {
-          id: `q_da_${Date.now()}_3`,
-          order: 3,
-          question: "Describe a time you encountered dirty, incomplete, or contradictory data in a key pipeline. How did you validate and clean it?",
-          category: "behavioral",
-          difficulty: req.difficulty,
-          contextHint: "Detail anomaly detection, imputation vs deletion trade-offs, and communication with data producers.",
-          expectedTopics: ["Data Cleaning", "Data Quality", "Anomaly Detection"],
-        },
       ];
     } else {
-      // General Software Engineer / Custom Role fallback
+      // General Software Engineer
       questionBank = [
         {
           id: `q_gen_${Date.now()}_1`,
           order: 1,
-          question: `Can you introduce your background in ${req.role} and explain the technical architecture of a recent project you are proud of?`,
+          question: `Can you introduce your background in ${req.role} and explain the technical architecture of a recent project you built?`,
           category: "introductory",
           difficulty: req.difficulty,
-          contextHint: "Give a crisp 90-second overview covering technical stack, your specific ownership, and key results.",
+          contextHint: "Give a crisp overview covering technical stack, your specific ownership, and key results.",
           expectedTopics: ["Project Overview", "Ownership", "Technical Stack"],
         },
         {
           id: `q_gen_${Date.now()}_2`,
           order: 2,
-          question: `What are the most important design trade-offs you consider when architecting systems for ${req.role} at a ${req.difficulty} level?`,
+          question: `What are the most important design trade-offs you consider when architecting systems for ${req.role}?`,
           category: "technical",
           difficulty: req.difficulty,
           contextHint: "Discuss performance, maintainability, scalability, and testability.",
@@ -206,41 +121,22 @@ export class MockAIService implements AIService {
         {
           id: `q_gen_${Date.now()}_3`,
           order: 3,
-          question: "Tell me about a time you faced an ambiguous technical requirement or disagreement with a team member. How did you achieve resolution?",
+          question: "Tell me about a critical bug or production incident you investigated. What was the root cause and how did you resolve it?",
           category: "behavioral",
           difficulty: req.difficulty,
-          contextHint: "Use the STAR method: Situation, Task, Action, Result with focus on collaboration.",
-          expectedTopics: ["Collaboration", "Conflict Resolution", "STAR method"],
-        },
-        {
-          id: `q_gen_${Date.now()}_4`,
-          order: 4,
-          question: "Describe how you approach automated testing, continuous integration, and code quality before shipping code to production.",
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Discuss unit vs integration tests, mocking, CI/CD pipelines, and rollback safety.",
-          expectedTopics: ["CI/CD", "Unit/Integration Testing", "Code Quality"],
-        },
-        {
-          id: `q_gen_${Date.now()}_5`,
-          order: 5,
-          question: "Walk me through how you would optimize a slow-performing API endpoint or query when traffic spikes 10x.",
-          category: "system-design",
-          difficulty: req.difficulty,
-          contextHint: "Cover profiling, caching, asynchronous workers, and database connection pooling.",
-          expectedTopics: ["Profiling", "Caching", "Async Queues", "Scaling"],
+          contextHint: "Use the STAR method: Situation, Task, Action, Result with post-mortem learnings.",
+          expectedTopics: ["Debugging", "Incident Management", "STAR method"],
         },
       ];
     }
 
-    // Adjust for requested count
     let selected = [...questionBank];
     while (selected.length < req.count) {
       const idx = selected.length + 1;
       selected.push({
         id: `q_extra_${Date.now()}_${idx}`,
         order: idx,
-        question: `How do you approach debugging and monitoring when unexpected errors occur in ${req.role} workflows?`,
+        question: `How do you approach debugging, monitoring, and telemetry when unexpected errors occur in production?`,
         category: "problem-solving",
         difficulty: req.difficulty,
         contextHint: "Mention telemetry, logging, metrics, and incident runbooks.",
@@ -253,151 +149,236 @@ export class MockAIService implements AIService {
   }
 
   async evaluateAnswer(req: EvaluateAnswerRequest): Promise<EvaluateAnswerResponse> {
-    await new Promise((r) => setTimeout(r, 650));
+    await new Promise((r) => setTimeout(r, 400));
 
-    const words = req.userAnswer.trim().split(/\s+/).filter(Boolean);
+    const text = req.userAnswer.trim();
+    const words = text.split(/\s+/).filter(Boolean);
     const wordCount = words.length;
-    const lowerText = req.userAnswer.toLowerCase();
+    const lower = text.toLowerCase();
 
-    let score = 7.5;
-    let commScore = 8.0;
-    let techScore = 7.5;
-    let relScore = 8.0;
-    let clarityScore = 8.0;
-    let confScore = 7.5;
+    // Check for "I don't know" or zero-effort answers
+    const isUnknown =
+      /^(i don'?t know|no idea|i am not sure|idk|pass|don'?t know|nothing|na|none|skip)\.?$/i.test(text) ||
+      wordCount < 4;
 
-    let whatWasGood = [
-      "Directly engaged with the question prompt without unnecessary delay",
-      "Demonstrated logical flow and structured thinking",
-    ];
-
-    let whatCouldImprove = [
-      "Incorporate more measurable metrics (e.g. latency reduced by X%, conversion increased by Y%)",
-      "Explicitly discuss alternative trade-offs you considered before picking your approach",
-    ];
-
-    if (wordCount < 18) {
-      score = 5.0;
-      commScore = 5.0;
-      techScore = 5.0;
-      relScore = 6.0;
-      clarityScore = 5.5;
-      confScore = 4.5;
-      whatWasGood = ["Answered concisely without rambling"];
-      whatCouldImprove = [
-        "Your response was quite brief. Elaborate with specific technical details and architecture context.",
-        "Use the STAR method to structure your situation, actions, and quantifiable outcomes.",
-      ];
-    } else if (wordCount > 60) {
-      score = 8.8;
-      commScore = 9.0;
-      techScore = 8.5;
-      relScore = 9.0;
-      clarityScore = 8.5;
-      confScore = 8.5;
-      whatWasGood = [
-        "Provided strong context and concrete technical terminology",
-        "Clearly explained the rationale behind decisions and trade-offs",
-        "Demonstrated solid domain understanding matching your target role",
-      ];
-      whatCouldImprove = [
-        "Keep delivery focused to avoid exceeding the ideal 90-120 second interview answer window",
-      ];
+    if (isUnknown) {
+      return {
+        evaluation: {
+          questionId: req.question.id,
+          score: 1.5,
+          communicationScore: 2.5,
+          technicalScore: 1.0,
+          relevanceScore: 1.5,
+          clarityScore: 3.0,
+          confidenceScore: 1.0,
+          feedback: `You indicated that you do not know the answer ("${text || "No response"}"). In a real technical interview, giving an 'I don't know' response without demonstrating problem-solving attempts results in a failing score for that question. Even when uncertain, articulate what you do know, ask clarifying questions, or discuss related technologies.`,
+          whatWasGood: ["Acknowledged knowledge boundary promptly"],
+          whatCouldImprove: [
+            "Never end with 'I don't know' — explain how you would investigate or debug the concept",
+            "Discuss related tools, design patterns, or fundamental principles to demonstrate problem-solving intuition",
+            "Ask clarifying questions to the interviewer to break down the problem into smaller parts",
+          ],
+          shouldFollowUp: false,
+        },
+      };
     }
 
-    // Check if we should trigger a contextual follow-up question
-    let shouldFollowUp = false;
-    let followUpQuestionText = undefined;
-    let followUpQuestion: InterviewQuestion | undefined = undefined;
-
-    if (req.canFollowUp) {
-      if (lowerText.includes("project") || lowerText.includes("built") || lowerText.includes("app") || lowerText.includes("mern") || lowerText.includes("react")) {
-        shouldFollowUp = true;
-        followUpQuestionText = "You mentioned that project — what was the hardest technical challenge or bottleneck you faced while building it, and how did you resolve it?";
-      } else if (lowerText.includes("database") || lowerText.includes("sql") || lowerText.includes("postgres") || lowerText.includes("mongo")) {
-        shouldFollowUp = true;
-        followUpQuestionText = "Regarding your database choices, how did you handle indexing, query optimization, or eventual consistency?";
-      } else if (lowerText.includes("team") || lowerText.includes("conflict") || lowerText.includes("disagree")) {
-        shouldFollowUp = true;
-        followUpQuestionText = "Looking back on that team situation, what would you do differently today to align stakeholders faster?";
-      }
-
-      if (shouldFollowUp && followUpQuestionText) {
-        followUpQuestion = {
-          id: `fu_${Date.now()}`,
-          order: req.question.order + 1,
-          question: followUpQuestionText,
-          category: req.question.category,
-          difficulty: req.difficulty,
-          isFollowUp: true,
-          parentQuestionId: req.question.id,
-          contextHint: "Dive deeper into specific challenges, trade-offs, and learnings from your previous answer.",
-        };
-      }
+    // Very short answers (< 15 words)
+    if (wordCount < 15) {
+      return {
+        evaluation: {
+          questionId: req.question.id,
+          score: 4.2,
+          communicationScore: 4.5,
+          technicalScore: 4.0,
+          relevanceScore: 5.0,
+          clarityScore: 4.5,
+          confidenceScore: 4.0,
+          feedback: `Your response was only ${wordCount} words long. While directly on-topic, it was too brief to demonstrate technical depth or architectural trade-offs expected for a ${req.difficulty} ${req.role} interview.`,
+          whatWasGood: ["Direct and concise response"],
+          whatCouldImprove: [
+            "Expand your answer with specific architecture components, technologies used, and real-world trade-offs",
+            "Use the STAR method (Situation, Task, Action, Result) to provide concrete examples",
+            "Mention measurable results or metrics from your experience",
+          ],
+          shouldFollowUp: false,
+        },
+      };
     }
 
+    // Medium answers (15 - 55 words)
+    if (wordCount < 55) {
+      const hasTechTerms = /(api|database|react|cache|state|service|latency|scaling|sql|async|component|schema|git|ci\/cd|pipeline)/i.test(lower);
+      const score = hasTechTerms ? 7.2 : 6.0;
+
+      return {
+        evaluation: {
+          questionId: req.question.id,
+          score,
+          communicationScore: hasTechTerms ? 7.5 : 6.5,
+          technicalScore: hasTechTerms ? 7.0 : 5.5,
+          relevanceScore: 7.5,
+          clarityScore: 7.0,
+          confidenceScore: 6.8,
+          feedback: `Solid answer explaining the core concept. To reach the top percentile, elaborate further on the trade-offs you evaluated and the specific metrics or constraints you operated under.`,
+          whatWasGood: [
+            "Good articulation of foundational concepts",
+            "Clear logical progression in your explanation",
+          ],
+          whatCouldImprove: [
+            "Include quantifiable impact (e.g. reduced latency by 30%, improved throughput)",
+            "Explain alternative solutions you considered and why your chosen approach was superior",
+          ],
+          shouldFollowUp: false,
+        },
+      };
+    }
+
+    // In-depth answers (55+ words)
     return {
       evaluation: {
         questionId: req.question.id,
-        score,
-        communicationScore: commScore,
-        technicalScore: techScore,
-        relevanceScore: relScore,
-        clarityScore,
-        confidenceScore: confScore,
-        feedback:
-          wordCount < 18
-            ? "Your response gave a quick high-level glance, but lacked the specific technical depth and concrete examples interviewers expect."
-            : "Strong, well-structured answer. You articulated your thought process clearly and grounded your response in realistic engineering considerations.",
-        whatWasGood,
-        whatCouldImprove,
-        shouldFollowUp,
-        followUpQuestionText,
+        score: 8.8,
+        communicationScore: 9.0,
+        technicalScore: 8.7,
+        relevanceScore: 9.0,
+        clarityScore: 8.8,
+        confidenceScore: 8.7,
+        feedback: `Excellent, comprehensive answer. You structured your explanation logically, incorporated concrete technical terminology, and demonstrated strong engineering depth.`,
+        whatWasGood: [
+          "Detailed technical depth with clear architectural context",
+          "Demonstrated practical understanding of trade-offs and constraints",
+          "Well-structured communication matching senior candidate standards",
+        ],
+        whatCouldImprove: [
+          "Keep your delivery focused to ensure answers fit comfortably within a 2-minute window during rapid-fire rounds",
+        ],
+        shouldFollowUp: false,
       },
-      followUpQuestion,
     };
   }
 
   async generateScorecard(req: GenerateScorecardRequest): Promise<GenerateScorecardResponse> {
-    await new Promise((r) => setTimeout(r, 750));
+    await new Promise((r) => setTimeout(r, 450));
 
-    const evals = Object.values(req.evaluations);
-    const count = Math.max(1, evals.length);
+    const questions = req.questions || [];
+    const evaluations = req.evaluations || {};
+    const answers = req.answers || {};
 
-    const comm = evals.reduce((a, b) => a + (b.communicationScore || 7.5), 0) / count;
-    const tech = evals.reduce((a, b) => a + (b.technicalScore || 7.5), 0) / count;
-    const rel = evals.reduce((a, b) => a + (b.relevanceScore || 8.0), 0) / count;
-    const clar = evals.reduce((a, b) => a + (b.clarityScore || 8.0), 0) / count;
-    const conf = evals.reduce((a, b) => a + (b.confidenceScore || 7.5), 0) / count;
+    let totalComm = 0;
+    let totalTech = 0;
+    let totalRel = 0;
+    let totalClar = 0;
+    let totalConf = 0;
+    let validCount = 0;
+    let unknownCount = 0;
 
-    const overall = Math.round(((comm + tech + rel + clar + conf) / 5) * 10);
+    for (const q of questions) {
+      const ans = answers[q.id]?.answerText?.trim() || "";
+      const isUnk =
+        /^(i don'?t know|no idea|i am not sure|idk|pass|don'?t know|nothing|na|none)\.?$/i.test(ans) ||
+        ans.split(/\s+/).filter(Boolean).length < 4;
+
+      if (isUnk) {
+        unknownCount++;
+      }
+
+      const ev = evaluations[q.id];
+      if (ev) {
+        totalComm += ev.communicationScore || 3.0;
+        totalTech += ev.technicalScore || 1.5;
+        totalRel += ev.relevanceScore || 2.0;
+        totalClar += ev.clarityScore || 3.0;
+        totalConf += ev.confidenceScore || 2.0;
+        validCount++;
+      } else if (isUnk) {
+        totalComm += 2.5;
+        totalTech += 1.0;
+        totalRel += 1.5;
+        totalClar += 3.0;
+        totalConf += 1.0;
+        validCount++;
+      }
+    }
+
+    const divisor = Math.max(1, validCount);
+    const commAvg = Number((totalComm / divisor).toFixed(1));
+    const techAvg = Number((totalTech / divisor).toFixed(1));
+    const relAvg = Number((totalRel / divisor).toFixed(1));
+    const clarAvg = Number((totalClar / divisor).toFixed(1));
+    const confAvg = Number((totalConf / divisor).toFixed(1));
+
+    // Dynamic overall score calculation from 0 to 100
+    const rawOverall = Math.round(((commAvg + techAvg + relAvg + clarAvg + confAvg) / 5) * 10);
+    const overallScore = Math.min(100, Math.max(12, rawOverall));
+
+    // Dynamic synthesis based on actual candidate score
+    let executiveSummary = "";
+    let strengths: string[] = [];
+    let areasToImprove: string[] = [];
+    let suggestedNextSteps: string[] = [];
+
+    if (overallScore < 35 || unknownCount >= questions.length / 2) {
+      executiveSummary = `Candidate answered 'I don't know' or gave minimal responses to ${unknownCount} out of ${questions.length} questions during the ${req.role} interview. To pass technical screenings, candidates must attempt to reason through unknown topics out loud, discuss relevant fundamentals, or ask clarifying questions rather than declining to answer.`;
+      strengths = [
+        "Transparent about immediate knowledge boundaries without guessing arbitrarily",
+        "Completed the full sequence of interview questions",
+      ];
+      areasToImprove = [
+        "Never answer 'I don't know' in isolation — articulate how you would debug or investigate the unknown problem",
+        "Prepare core foundational concepts for your target role (data structures, system flow, architecture patterns)",
+        "Use the STAR framework to structure answers even when recalling partial knowledge",
+      ];
+      suggestedNextSteps = [
+        `Review core ${req.role} fundamentals and common architectural trade-offs`,
+        "Practice mock interviewing by speaking your thought process aloud when encountering unfamiliar questions",
+        "Prepare 3 concrete project deep-dives that you can reference across multiple technical scenarios",
+      ];
+    } else if (overallScore < 65) {
+      executiveSummary = `Candidate demonstrated foundational understanding of ${req.role} concepts but responses were frequently brief and lacked the technical depth, quantifiable metrics, and edge-case awareness expected for a ${req.difficulty} level interview.`;
+      strengths = [
+        "Understood the intent of each question and provided on-topic responses",
+        "Demonstrated working knowledge of primary domain tools",
+      ];
+      areasToImprove = [
+        "Elaborate on architectural trade-offs rather than providing single-sentence summaries",
+        "Include measurable impact (e.g. performance gains, reliability metrics, business outcomes)",
+        "Discuss failure modes, caching strategies, and debugging methodologies",
+      ];
+      suggestedNextSteps = [
+        "Practice answering technical questions using the 90-second structured architecture overview format",
+        "Deepen your understanding of system constraints and trade-offs for your chosen tech stack",
+      ];
+    } else {
+      executiveSummary = `Strong, well-articulated performance for a ${req.difficulty} ${req.role} interview. Responses demonstrated deep technical accuracy, clear communication structure, and solid engineering decision-making.`;
+      strengths = [
+        "Articulated technical concepts clearly with strong domain vocabulary",
+        "Demonstrated practical understanding of system architecture and engineering constraints",
+        "Maintained structured, confident communication throughout the session",
+      ];
+      areasToImprove = [
+        "Continue refining concise delivery to keep long answers under 2 minutes during rapid-fire rounds",
+        "Include more explicit discussion of alternative technologies considered and rejected",
+      ];
+      suggestedNextSteps = [
+        "Practice high-level system design diagrams and distributed bottlenecks for senior rounds",
+        "Refine your personal storytelling for executive behavioral interviews",
+      ];
+    }
 
     return {
       scorecard: {
-        sessionId: "session-mock",
-        overallScore: Math.min(100, Math.max(45, overall)),
-        communicationScore: Number(comm.toFixed(1)),
-        technicalScore: Number(tech.toFixed(1)),
-        relevanceScore: Number(rel.toFixed(1)),
-        clarityScore: Number(clar.toFixed(1)),
-        confidenceScore: Number(conf.toFixed(1)),
-        executiveSummary: `You demonstrated solid foundational interview readiness for a ${req.difficulty} ${req.role} position. Your responses showed clear structured thinking and relevant domain terminology. Focusing on quantifiable metrics and explaining alternative trade-offs will elevate your answers to top-percentile candidate quality.`,
-        strengths: [
-          "Structured communication logically and directly addressed the interviewer prompts",
-          "Demonstrated practical understanding of engineering constraints and trade-offs",
-          "Maintained a professional, confident tone throughout the verbal dialogue",
-          "Articulated technical terminology accurately within your target role domain",
-        ],
-        areasToImprove: [
-          "Incorporate more quantifiable business/system metrics (e.g. latency, throughput, conversion impact)",
-          "Elaborate more deeply on edge cases, database failure modes, and rollback strategies",
-          "Keep introductory project summaries under 90 seconds to preserve time for deep-dive questions",
-        ],
-        suggestedNextSteps: [
-          "Practice explaining past projects in 90 seconds using a concise STAR outline",
-          "Review REST API vs gRPC / GraphQL fundamentals and database indexing trade-offs",
-          "Give more measurable impact and explicit metric benchmarks in behavioral answers",
-        ],
+        sessionId: "session-dynamic",
+        overallScore,
+        communicationScore: commAvg,
+        technicalScore: techAvg,
+        relevanceScore: relAvg,
+        clarityScore: clarAvg,
+        confidenceScore: confAvg,
+        executiveSummary,
+        strengths,
+        areasToImprove,
+        suggestedNextSteps,
         completedAt: new Date().toISOString(),
       },
     };

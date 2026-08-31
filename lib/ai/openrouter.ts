@@ -24,7 +24,7 @@ export class OpenRouterAIService implements AIService {
   constructor(
     apiKey: string,
     baseUrl: string = "https://openrouter.ai/api/v1",
-    primaryModel: string = "liquid/lfm-2.5-2.6b:free"
+    primaryModel: string = "nvidia/nemotron-3.5-lightning:free"
   ) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/+$/, "");
@@ -35,8 +35,14 @@ export class OpenRouterAIService implements AIService {
   private cleanAndParseJSON(rawContent: string): any {
     if (!rawContent) throw new Error("Empty response from OpenRouter");
 
-    let text = rawContent.replace(/```json/gi, "").replace(/```/g, "").trim();
+    // 1. Look for ```json ... ``` code blocks first
+    const codeBlockMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    let text = codeBlockMatch ? codeBlockMatch[1].trim() : rawContent.trim();
 
+    // 2. Remove any HTML or tags if present
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+    // 3. Find the outermost JSON block { ... }
     const firstOpen = text.indexOf("{");
     const lastClose = text.lastIndexOf("}");
     if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
@@ -49,14 +55,12 @@ export class OpenRouterAIService implements AIService {
   private async callOpenRouter(
     systemInstruction: string,
     promptText: string,
-    maxTokens: number = 750
+    maxTokens: number = 2048
   ): Promise<any> {
     const url = `${this.baseUrl}/chat/completions`;
     const modelsToTry = [
       this.primaryModel,
       "nvidia/nemotron-3.5-lightning:free",
-      "google/gemini-2.0-flash-001",
-      "meta-llama/llama-3.3-70b-instruct",
     ];
 
     let lastError: any = null;
@@ -64,7 +68,7 @@ export class OpenRouterAIService implements AIService {
     for (const model of modelsToTry) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout for fast response
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
         const response = await fetch(url, {
           method: "POST",
@@ -81,14 +85,14 @@ export class OpenRouterAIService implements AIService {
             messages: [
               {
                 role: "system",
-                content: systemInstruction + "\nYou MUST output strictly valid JSON.",
+                content: systemInstruction + "\nYou MUST output strictly valid JSON matching the requested schema.",
               },
               {
                 role: "user",
                 content: promptText,
               },
             ],
-            temperature: 0.5,
+            temperature: 0.2,
           }),
         });
 
@@ -115,13 +119,14 @@ export class OpenRouterAIService implements AIService {
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
     try {
       const prompt = createQuestionsPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 800);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 2048);
 
       if (parsed?.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         return { questions: parsed.questions };
       }
       throw new Error("Invalid questions schema from OpenRouter");
     } catch (err) {
+      console.warn("OpenRouter generateQuestions fallback:", err);
       return this.fallbackService.generateQuestions(req);
     }
   }
@@ -129,7 +134,7 @@ export class OpenRouterAIService implements AIService {
   async evaluateAnswer(req: EvaluateAnswerRequest): Promise<EvaluateAnswerResponse> {
     try {
       const prompt = createEvaluationPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 450);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 2048);
 
       if (parsed?.evaluation) {
         let followUpQuestion = undefined;
@@ -149,6 +154,7 @@ export class OpenRouterAIService implements AIService {
       }
       throw new Error("Invalid evaluation schema from OpenRouter");
     } catch (err) {
+      console.warn("OpenRouter evaluateAnswer fallback:", err);
       return this.fallbackService.evaluateAnswer(req);
     }
   }
@@ -156,13 +162,14 @@ export class OpenRouterAIService implements AIService {
   async generateScorecard(req: GenerateScorecardRequest): Promise<GenerateScorecardResponse> {
     try {
       const prompt = createScorecardPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 950);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 2048);
 
       if (parsed?.scorecard) {
         return { scorecard: parsed.scorecard };
       }
       throw new Error("Invalid scorecard schema from OpenRouter");
     } catch (err) {
+      console.warn("OpenRouter generateScorecard fallback:", err);
       return this.fallbackService.generateScorecard(req);
     }
   }
