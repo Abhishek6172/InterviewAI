@@ -50,7 +50,7 @@ export default function LandingPage() {
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300">
             <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-            AI Interviewer Active
+            Adya AI Active
           </div>
           <Link href="/analytics">
             <Button variant="ghost" size="sm" className="text-xs text-slate-400 hover:text-white px-2.5 sm:px-3">
@@ -76,14 +76,14 @@ export default function LandingPage() {
         </div>
 
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15]">
-          Practice interviews{" "}
+          Practice interviews with{" "}
           <span className="bg-gradient-to-r from-purple-400 via-rose-300 to-indigo-300 bg-clip-text text-transparent">
-            like they&apos;re real.
+            Adya AI.
           </span>
         </h1>
 
         <p className="max-w-2xl mx-auto text-sm sm:text-base lg:text-lg text-slate-300 leading-relaxed font-normal px-2">
-          InterviewAI gives you a realistic AI interviewer that adapts to your answers, probes your resume projects,
+          Meet Adya — your realistic AI interviewer who adapts to your answers, probes your resume projects,
           and delivers structured performance feedback.
         </p>
 
@@ -118,12 +118,12 @@ export default function LandingPage() {
       <section className="w-full max-w-3xl glass-panel-glow rounded-3xl p-4 sm:p-8 mb-16 sm:mb-20 border border-purple-500/25">
         <div className="flex flex-col items-center text-center space-y-3 sm:space-y-4">
           <div className="flex items-center gap-2 text-[11px] sm:text-xs font-semibold text-purple-400 uppercase tracking-wider">
-            <span>Live Interactive Avatar Experience</span>
+            <span>Meet Adya — Your AI Interviewer</span>
           </div>
 
           <AIAvatar
             state={demoState}
-            interviewerName="Alex"
+            interviewerName="Adya"
             roleTitle="Senior AI Technical Interviewer"
             caption={
               demoState === "speaking"
@@ -232,7 +232,7 @@ export default function LandingPage() {
               Choose Role & Resume
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Select your target role, difficulty, and optionally upload your resume so questions probe your real projects.
+              Select your target role, difficulty, and optionally upload your resume so Adya probes your real projects.
             </p>
           </Card>
 
@@ -242,10 +242,10 @@ export default function LandingPage() {
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
               <Bot className="w-4 h-4 text-rose-400" />
-              Interview with AI Avatar
+              Interview with Adya
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Practice out loud with voice recognition or type your responses. The AI interviewer actively listens and asks follow-ups.
+              Practice out loud with voice recognition or type your responses. Adya actively listens and asks follow-ups.
             </p>
           </Card>
 
@@ -267,7 +267,7 @@ export default function LandingPage() {
       {/* Bottom CTA Banner */}
       <section className="w-full max-w-5xl rounded-3xl bg-gradient-to-r from-purple-950/60 via-indigo-950/50 to-rose-950/60 border border-purple-500/25 p-6 sm:p-12 text-center space-y-4 sm:space-y-6">
         <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
-          Ready to experience your next mock interview?
+          Ready to interview with Adya?
         </h2>
         <p className="text-xs sm:text-base text-slate-300 max-w-xl mx-auto">
           Practice with realistic conversational pressure and build confidence for your dream role.

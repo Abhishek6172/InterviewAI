@@ -14,6 +14,8 @@ export interface SpeechSynthesisOptions {
 
 export class BrowserSpeechService {
   private static recognitionInstance: any = null;
+  private static cachedVoice: SpeechSynthesisVoice | null = null;
+  private static isInitialized = false;
 
   public static isSpeechSynthesisSupported(): boolean {
     return typeof window !== "undefined" && "speechSynthesis" in window;
@@ -26,6 +28,52 @@ export class BrowserSpeechService {
     );
   }
 
+  /**
+   * Resolve a consistent natural voice for Adya
+   */
+  public static getConsistentVoice(): SpeechSynthesisVoice | null {
+    if (this.cachedVoice) return this.cachedVoice;
+    if (!this.isSpeechSynthesisSupported()) return null;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+
+    // Preference hierarchy for clear, professional female/natural voice (Adya)
+    const priorityKeywords = [
+      "Google US English",
+      "Microsoft Jenny Online (Natural)",
+      "Microsoft Aria Online (Natural)",
+      "Microsoft Zira",
+      "Samantha",
+      "Victoria",
+      "Karen",
+      "en-US",
+      "en-GB",
+    ];
+
+    for (const keyword of priorityKeywords) {
+      const match = voices.find(
+        (v) =>
+          v.lang.startsWith("en") &&
+          (v.name.includes(keyword) || v.voiceURI.includes(keyword))
+      );
+      if (match) {
+        this.cachedVoice = match;
+        return match;
+      }
+    }
+
+    // Fallback: any English voice
+    const anyEnglish = voices.find((v) => v.lang.startsWith("en"));
+    if (anyEnglish) {
+      this.cachedVoice = anyEnglish;
+      return anyEnglish;
+    }
+
+    this.cachedVoice = voices[0] || null;
+    return this.cachedVoice;
+  }
+
   public static speak(text: string, options: SpeechSynthesisOptions = {}) {
     if (!this.isSpeechSynthesisSupported()) {
       options.onEnd?.();
@@ -33,32 +81,43 @@ export class BrowserSpeechService {
     }
 
     try {
-      window.speechSynthesis.cancel(); // Stop ongoing speech
+      window.speechSynthesis.cancel(); // Stop any ongoing speech
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = options.rate ?? 1.0;
-      utterance.pitch = options.pitch ?? 1.0;
+      const doSpeak = () => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = options.rate ?? 1.0;
+        utterance.pitch = options.pitch ?? 1.0;
 
-      // Select a natural sounding English voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(
-        (v) =>
-          v.lang.startsWith("en") &&
-          (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Daniel"))
-      );
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
+        const voice = this.getConsistentVoice();
+        if (voice) {
+          utterance.voice = voice;
+        }
 
-      utterance.onstart = () => options.onStart?.();
-      utterance.onend = () => options.onEnd?.();
-      utterance.onerror = (e) => {
-        console.warn("SpeechSynthesis error:", e);
-        options.onError?.(e);
-        options.onEnd?.();
+        utterance.onstart = () => options.onStart?.();
+        utterance.onend = () => options.onEnd?.();
+        utterance.onerror = (e) => {
+          console.warn("SpeechSynthesis error:", e);
+          options.onError?.(e);
+          options.onEnd?.();
+        };
+
+        window.speechSynthesis.speak(utterance);
       };
 
-      window.speechSynthesis.speak(utterance);
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) {
+        // Wait for voices to load asynchronously
+        window.speechSynthesis.onvoiceschanged = () => {
+          this.getConsistentVoice();
+          doSpeak();
+        };
+        // Safety timeout
+        setTimeout(() => {
+          if (!this.cachedVoice) doSpeak();
+        }, 150);
+      } else {
+        doSpeak();
+      }
     } catch (err) {
       console.warn("Error triggering speech synthesis:", err);
       options.onEnd?.();

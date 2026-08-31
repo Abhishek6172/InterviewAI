@@ -277,11 +277,11 @@ export default function InterviewSessionPage() {
 
       {/* Main Centered Stage */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-4 sm:py-6 flex flex-col items-center justify-start space-y-4">
-        {/* Prominent AI Avatar (Always Centered & Visible) */}
+        {/* Prominent AI Avatar (Named Adya) */}
         <div className="w-full flex justify-center shrink-0">
           <AIAvatar
             state={avatarState}
-            interviewerName="Alex"
+            interviewerName="Adya"
             roleTitle={`${session.options.role} Interviewer`}
             className="p-1 sm:p-2"
           />

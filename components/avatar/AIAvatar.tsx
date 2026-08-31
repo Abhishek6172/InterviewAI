@@ -17,7 +17,7 @@ export interface AIAvatarProps {
 
 export function AIAvatar({
   state = "idle",
-  interviewerName = "Alex",
+  interviewerName = "Adya",
   roleTitle = "Senior AI Interviewer",
   caption,
   className,
@@ -89,7 +89,7 @@ export function AIAvatar({
           style={{ animationDuration: state === "thinking" ? "4s" : "8s" }}
         />
 
-        {/* Core Avatar Orb (Responsive: 28 on mobile, 40 on desktop) */}
+        {/* Core Avatar Orb */}
         <div
           className={cn(
             "relative w-28 h-28 sm:w-40 sm:h-40 rounded-full border flex flex-col items-center justify-center backdrop-blur-2xl transition-all duration-500 overflow-hidden",
