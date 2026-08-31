@@ -22,12 +22,16 @@ import {
   Award,
   CheckCircle2,
   AlertCircle,
+  MessageSquare,
+  Star,
 } from "lucide-react";
 
 export default function InterviewResultsPage() {
   const router = useRouter();
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+  const [showFloatingFeedbackPrompt, setShowFloatingFeedbackPrompt] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
     const active = SessionManager.getActiveSession();
@@ -37,7 +41,23 @@ export default function InterviewResultsPage() {
     }
     setSession(active);
     AnalyticsTracker.track("results_viewed", {}, active.id);
+
+    // Scroll listener to show slide-up feedback prompt
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowFloatingFeedbackPrompt(true);
+      } else {
+        setShowFloatingFeedbackPrompt(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [router]);
+
+  const scrollToFeedback = () => {
+    document.getElementById("feedback-form-section")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   if (!session || !session.scorecard) {
     return (
@@ -59,7 +79,7 @@ export default function InterviewResultsPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <div className="w-full max-w-5xl mx-auto px-4 py-8 sm:py-10 space-y-8 relative">
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
         <div>
@@ -70,7 +90,7 @@ export default function InterviewResultsPage() {
             <span className="text-xs text-slate-400 capitalize">{options.difficulty} Difficulty</span>
             <span className="text-xs text-slate-400">&bull; {options.experienceLevel}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
             Interview Performance Scorecard
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
@@ -100,8 +120,8 @@ export default function InterviewResultsPage() {
 
       {/* Question-by-Question Deep Dive */}
       <div className="space-y-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          <FileCheck className="w-5 h-5 text-blue-400" />
+        <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+          <FileCheck className="w-5 h-5 text-purple-400" />
           Question-by-Question Review
         </h3>
 
@@ -119,7 +139,7 @@ export default function InterviewResultsPage() {
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3 pr-4">
-                    <span className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 text-xs flex items-center justify-center font-bold shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-purple-600/20 text-purple-400 text-xs flex items-center justify-center font-bold shrink-0">
                       {idx + 1}
                     </span>
                     <div>
@@ -137,7 +157,7 @@ export default function InterviewResultsPage() {
 
                   <div className="flex items-center gap-3 shrink-0">
                     {ev && (
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/25">
                         {ev.score}/10
                       </span>
                     )}
@@ -163,7 +183,7 @@ export default function InterviewResultsPage() {
                     {ev && (
                       <div className="space-y-3">
                         <div>
-                          <span className="text-xs font-semibold text-blue-400 block mb-1">AI Evaluation:</span>
+                          <span className="text-xs font-semibold text-purple-400 block mb-1">Sara Evaluation:</span>
                           <p className="text-xs text-slate-300 leading-relaxed">{ev.feedback}</p>
                         </div>
 
@@ -211,9 +231,12 @@ export default function InterviewResultsPage() {
         </div>
       </div>
 
-      {/* Real User Validation & Feedback Form */}
-      <div className="pt-4">
-        <FeedbackModal sessionId={session.id} />
+      {/* High-Prominence Candidate Feedback Form Section */}
+      <div className="pt-6">
+        <FeedbackModal
+          sessionId={session.id}
+          onFeedbackSubmitted={() => setFeedbackSubmitted(true)}
+        />
       </div>
 
       {/* Footer CTA */}
@@ -223,6 +246,33 @@ export default function InterviewResultsPage() {
           <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
+
+      {/* Sticky Slide-up Popup Prompt on Scroll */}
+      {showFloatingFeedbackPrompt && !feedbackSubmitted && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-lg animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="p-3.5 rounded-2xl bg-[#0e101a]/95 border border-purple-500/40 backdrop-blur-xl shadow-2xl shadow-purple-500/20 flex items-center justify-between gap-3 ring-1 ring-purple-500/30">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 shrink-0">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white block">Rate your interview with Sara</span>
+                <span className="text-[11px] text-slate-400">Takes 60 seconds &bull; Help us improve</span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="glow"
+              size="sm"
+              onClick={scrollToFeedback}
+              className="text-xs h-8 px-3.5 shrink-0 cursor-pointer"
+            >
+              Review Now ⭐
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

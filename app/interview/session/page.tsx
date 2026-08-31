@@ -119,13 +119,20 @@ export default function InterviewSessionPage() {
     }
     BrowserSpeechService.stopSpeaking();
 
+    const isSkipped = answerText.toLowerCase().includes("skip");
     const durationSeconds = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
     const currentQ: InterviewQuestion = session.questions[session.currentQuestionIndex];
     const isLastQuestion = session.currentQuestionIndex >= session.questions.length - 1;
 
     setIsEvaluating(true);
     setAvatarState("thinking");
-    setStatusMessage(isLastQuestion ? "Finalizing interview & generating scorecard..." : "Analyzing response...");
+    setStatusMessage(
+      isSkipped
+        ? "Skipping to next question..."
+        : isLastQuestion
+        ? "Finalizing interview & generating scorecard..."
+        : "Analyzing response..."
+    );
 
     // Record answer in storage immediately
     SessionManager.recordAnswer(session.id, currentQ.id, answerText, durationSeconds, mode);
@@ -135,6 +142,7 @@ export default function InterviewSessionPage() {
         questionId: currentQ.id,
         durationSeconds,
         mode,
+        isSkipped,
         wordCount: answerText.split(/\s+/).length,
       },
       session.id
@@ -324,6 +332,7 @@ export default function InterviewSessionPage() {
               isListening={isListening}
               onToggleListening={handleToggleListening}
               onSubmitAnswer={handleSubmitAnswer}
+              onSkipQuestion={() => handleSubmitAnswer("Question skipped by candidate", "text")}
               disabled={isEvaluating || avatarState === "speaking"}
               externalTranscript={voiceTranscript}
             />
