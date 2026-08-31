@@ -24,11 +24,19 @@ export interface AnalyticsEvent {
 export interface ValidationFeedback {
   id: string;
   sessionId: string;
-  isUseful: boolean | null;
-  realismRating?: number; // 1-5
-  experienceRating?: number; // 1-5
-  wouldUseAgain?: "yes" | "maybe" | "no" | null;
+  name?: string;
+  email?: string;
+  isUseful?: boolean | null;
+  overallExperience: number; // 1-5
+  aiRealism: number; // 1-5
+  realismRating?: number; // legacy alias
+  experienceRating?: number; // legacy alias
+  audioExperience?: number; // 1-5
+  rolePreparedness?: "much_more_prepared" | "somewhat_prepared" | "needs_practice" | string;
+  likedMost?: string;
   confusingAspects?: string;
   improvementSuggestions?: string;
+  wouldUseAgain?: "yes" | "maybe" | "no" | null;
   submittedAt: string;
+  googleFormSynced?: boolean;
 }

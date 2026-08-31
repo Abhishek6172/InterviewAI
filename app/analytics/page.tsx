@@ -18,6 +18,11 @@ import {
   ChevronLeft,
   RefreshCw,
   Clock,
+  User,
+  Volume2,
+  BrainCircuit,
+  Heart,
+  Sparkles,
 } from "lucide-react";
 
 export default function AnalyticsDashboardPage() {
@@ -46,10 +51,14 @@ export default function AnalyticsDashboardPage() {
   }, []);
 
   const totalFeedbacks = feedbacks.length;
-  const usefulCount = feedbacks.filter((f) => f.isUseful === true).length;
-  const notUsefulCount = feedbacks.filter((f) => f.isUseful === false).length;
-  const avgRating = totalFeedbacks
-    ? (feedbacks.reduce((a, b) => a + (b.realismRating || b.experienceRating || 0), 0) / totalFeedbacks).toFixed(1)
+  const avgOverall = totalFeedbacks
+    ? (feedbacks.reduce((a, b) => a + (b.overallExperience || b.realismRating || 5), 0) / totalFeedbacks).toFixed(1)
+    : "N/A";
+  const avgRealism = totalFeedbacks
+    ? (feedbacks.reduce((a, b) => a + (b.aiRealism || b.realismRating || 5), 0) / totalFeedbacks).toFixed(1)
+    : "N/A";
+  const avgAudio = totalFeedbacks
+    ? (feedbacks.reduce((a, b) => a + (b.audioExperience || 5), 0) / totalFeedbacks).toFixed(1)
     : "N/A";
 
   return (
@@ -73,10 +82,10 @@ export default function AnalyticsDashboardPage() {
           <Badge variant="purple" className="text-xs">
             Product Telemetry & Validation
           </Badge>
-          <span className="text-xs text-muted-foreground">Real-Time Client & API Store</span>
+          <span className="text-xs text-muted-foreground">Real-Time Client, API & Google Form Store</span>
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          Live Traction & Conversion Funnel
+          Live Traction & Feedback Insights
         </h1>
         <p className="text-sm text-slate-400">
           Raw event telemetry and real user validation responses collected from actual candidate sessions.
@@ -119,40 +128,46 @@ export default function AnalyticsDashboardPage() {
       </div>
 
       {/* Validation Feedback Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="p-5 glass-panel flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground block">Total Submissions</span>
+            <span className="text-xs text-muted-foreground block">Total Feedbacks</span>
             <span className="text-2xl font-bold text-white">{totalFeedbacks}</span>
           </div>
-          <Users className="w-8 h-8 text-blue-400/50" />
+          <Users className="w-7 h-7 text-blue-400/50" />
         </Card>
 
         <Card className="p-5 glass-panel flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground block">Perceived Realism</span>
+            <span className="text-xs text-muted-foreground block">Overall Experience</span>
             <div className="flex items-center gap-1">
-              <span className="text-2xl font-bold text-amber-400">{avgRating}</span>
+              <span className="text-2xl font-bold text-amber-400">{avgOverall}</span>
               <span className="text-xs text-slate-400">/ 5</span>
             </div>
           </div>
-          <Star className="w-8 h-8 text-amber-400/50" />
+          <Star className="w-7 h-7 text-amber-400/50" />
         </Card>
 
         <Card className="p-5 glass-panel flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground block">Usefulness Ratio</span>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                <ThumbsUp className="w-3.5 h-3.5" /> {usefulCount}
-              </span>
-              <span className="text-slate-600">&bull;</span>
-              <span className="text-xs text-red-400 font-semibold flex items-center gap-1">
-                <ThumbsDown className="w-3.5 h-3.5" /> {notUsefulCount}
-              </span>
+            <span className="text-xs text-muted-foreground block">Adya AI Realism</span>
+            <div className="flex items-center gap-1">
+              <span className="text-2xl font-bold text-purple-400">{avgRealism}</span>
+              <span className="text-xs text-slate-400">/ 5</span>
             </div>
           </div>
-          <CheckCircle2 className="w-8 h-8 text-emerald-400/50" />
+          <BrainCircuit className="w-7 h-7 text-purple-400/50" />
+        </Card>
+
+        <Card className="p-5 glass-panel flex items-center justify-between">
+          <div>
+            <span className="text-xs text-muted-foreground block">Voice & Audio</span>
+            <div className="flex items-center gap-1">
+              <span className="text-2xl font-bold text-emerald-400">{avgAudio}</span>
+              <span className="text-xs text-slate-400">/ 5</span>
+            </div>
+          </div>
+          <Volume2 className="w-7 h-7 text-emerald-400/50" />
         </Card>
       </div>
 
@@ -160,8 +175,8 @@ export default function AnalyticsDashboardPage() {
       <Card className="glass-panel border-white/10 p-6 space-y-4">
         <CardHeader className="p-0">
           <CardTitle className="text-lg text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-blue-400" />
-            Qualitative Feedback Log ({totalFeedbacks})
+            <Users className="w-5 h-5 text-purple-400" />
+            Candidate Feedback Log ({totalFeedbacks})
           </CardTitle>
         </CardHeader>
 
@@ -169,7 +184,7 @@ export default function AnalyticsDashboardPage() {
           <div className="py-8 text-center text-xs text-slate-400 space-y-2">
             <p>No feedback submissions collected yet.</p>
             <p className="text-slate-500">
-              Complete a mock interview at <Link href="/interview/setup" className="text-blue-400 underline">/interview/setup</Link> and submit feedback to populate this table.
+              Complete a mock interview at <Link href="/interview/setup" className="text-purple-400 underline">/interview/setup</Link> and submit feedback to populate this table.
             </p>
           </div>
         ) : (
@@ -181,15 +196,14 @@ export default function AnalyticsDashboardPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] text-blue-400">Session: {fb.sessionId.slice(-8)}</span>
-                    <Badge variant={fb.isUseful ? "success" : "destructive"} className="text-[10px]">
-                      {fb.isUseful ? "👍 Useful" : "👎 Needs Improvement"}
+                    <span className="font-semibold text-white flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-purple-400" />
+                      {fb.name || "Anonymous Candidate"}
+                    </span>
+                    <Badge variant="purple" className="text-[10px]">
+                      ⭐ {fb.overallExperience || fb.realismRating || 5}/5
                     </Badge>
-                    {fb.wouldUseAgain && (
-                      <Badge variant="outline" className="text-[10px] capitalize">
-                        Use Again: {fb.wouldUseAgain}
-                      </Badge>
-                    )}
+                    {fb.email && <span className="text-[11px] text-slate-400">({fb.email})</span>}
                   </div>
                   <div className="flex items-center gap-2 text-slate-400 text-[11px]">
                     <Clock className="w-3 h-3" />
@@ -198,16 +212,20 @@ export default function AnalyticsDashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                  {fb.confusingAspects && (
+                  {fb.likedMost && (
                     <div>
-                      <span className="text-[11px] font-semibold text-slate-400 block mb-0.5">Confusing Aspects:</span>
-                      <p className="text-slate-200 leading-relaxed italic">&ldquo;{fb.confusingAspects}&rdquo;</p>
+                      <span className="text-[11px] font-semibold text-emerald-400 block mb-0.5 flex items-center gap-1">
+                        <Heart className="w-3 h-3" /> Liked Most:
+                      </span>
+                      <p className="text-slate-200 leading-relaxed italic">&ldquo;{fb.likedMost}&rdquo;</p>
                     </div>
                   )}
 
                   {fb.improvementSuggestions && (
                     <div>
-                      <span className="text-[11px] font-semibold text-blue-400 block mb-0.5">Suggested Improvements:</span>
+                      <span className="text-[11px] font-semibold text-purple-400 block mb-0.5 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Suggested Improvements:
+                      </span>
                       <p className="text-slate-200 leading-relaxed italic">&ldquo;{fb.improvementSuggestions}&rdquo;</p>
                     </div>
                   )}
