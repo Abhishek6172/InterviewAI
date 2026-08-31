@@ -11,7 +11,7 @@ import { BrowserSpeechService } from "@/lib/utils/speech";
 import { AnalyticsTracker } from "@/lib/analytics/tracker";
 import { AvatarState } from "@/types/avatar";
 import { InterviewSession, InterviewQuestion } from "@/types/interview";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, Sparkles } from "lucide-react";
 
 export default function InterviewSessionPage() {
   const router = useRouter();
@@ -45,7 +45,7 @@ export default function InterviewSessionPage() {
 
     BrowserSpeechService.speak(qText, {
       pitch: 1.0,
-      rate: 1.0,
+      rate: 1.05,
       onStart: () => {
         setAvatarState("speaking");
       },
@@ -108,7 +108,7 @@ export default function InterviewSessionPage() {
     }
   };
 
-  // Submit Answer
+  // Submit Answer with Snappy Fast Transition
   const handleSubmitAnswer = async (answerText: string, mode: "voice" | "text") => {
     if (!session) return;
 
@@ -120,12 +120,13 @@ export default function InterviewSessionPage() {
 
     const durationSeconds = Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000));
     const currentQ: InterviewQuestion = session.questions[session.currentQuestionIndex];
+    const isLastQuestion = session.currentQuestionIndex >= session.questions.length - 1;
 
     setIsEvaluating(true);
     setAvatarState("thinking");
-    setStatusMessage("Evaluating response and analyzing context...");
+    setStatusMessage(isLastQuestion ? "Finalizing interview & generating scorecard..." : "Analyzing response...");
 
-    // Record answer
+    // Record answer in storage immediately
     SessionManager.recordAnswer(session.id, currentQ.id, answerText, durationSeconds, mode);
     AnalyticsTracker.track(
       "question_answered",
@@ -149,8 +150,8 @@ export default function InterviewSessionPage() {
       }));
 
     try {
-      // 1. Evaluate current answer
-      const evalRes = await fetch("/api/evaluate", {
+      // Background async evaluation promise
+      const evalPromise = fetch("/api/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -162,37 +163,45 @@ export default function InterviewSessionPage() {
           userAnswer: answerText,
           resumeText: session.options.resumeText || "",
           conversationHistory: history,
-          canFollowUp: !currentQ.isFollowUp && session.currentQuestionIndex < session.questions.length - 1,
+          canFollowUp: !currentQ.isFollowUp && !isLastQuestion,
         }),
-      });
+      })
+        .then((res) => res.json())
+        .then((evalData) => {
+          if (evalData?.evaluation) {
+            SessionManager.recordEvaluation(session.id, evalData.evaluation);
+          }
+          if (evalData?.followUpQuestion) {
+            SessionManager.insertFollowUpQuestion(session.id, evalData.followUpQuestion);
+          }
+        })
+        .catch((err) => console.warn("Background evaluation note:", err));
 
-      const evalData = await evalRes.json();
-      if (evalData.evaluation) {
-        SessionManager.recordEvaluation(session.id, evalData.evaluation);
-      }
+      if (!isLastQuestion) {
+        // Snappy transition for middle questions (max 600ms pause)
+        await Promise.race([
+          evalPromise,
+          new Promise((resolve) => setTimeout(resolve, 600)),
+        ]);
 
-      // Check if AI generated a contextual follow-up question
-      if (evalData.followUpQuestion) {
-        SessionManager.insertFollowUpQuestion(session.id, evalData.followUpQuestion);
-      }
+        const updatedSession = SessionManager.getActiveSession() || session;
+        const nextIndex = updatedSession.currentQuestionIndex + 1;
 
-      // Re-read updated session from storage
-      const updatedSession = SessionManager.getActiveSession() || session;
-      const nextIndex = updatedSession.currentQuestionIndex + 1;
-
-      if (nextIndex < updatedSession.questions.length) {
-        // Advance to next question
-        updatedSession.currentQuestionIndex = nextIndex;
-        SessionManager.saveSession(updatedSession);
-        setSession(updatedSession);
-        setVoiceTranscript("");
-        setIsEvaluating(false);
-        setAvatarState("idle");
+        if (nextIndex < updatedSession.questions.length) {
+          updatedSession.currentQuestionIndex = nextIndex;
+          SessionManager.saveSession(updatedSession);
+          setSession({ ...updatedSession });
+          setVoiceTranscript("");
+          setIsEvaluating(false);
+          setAvatarState("idle");
+        }
       } else {
-        // Interview complete!
+        // Last question: await scorecard generation
+        await evalPromise;
         setIsCompletedTransition(true);
         setStatusMessage("Interview complete. Generating your scorecard...");
 
+        const updatedSession = SessionManager.getActiveSession() || session;
         const finalScorecardRes = await fetch("/api/evaluate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -210,7 +219,7 @@ export default function InterviewSessionPage() {
         });
 
         const scorecardData = await finalScorecardRes.json();
-        if (scorecardData.scorecard) {
+        if (scorecardData?.scorecard) {
           SessionManager.completeSession(updatedSession.id, scorecardData.scorecard);
           AnalyticsTracker.track(
             "interview_completed",
@@ -223,13 +232,12 @@ export default function InterviewSessionPage() {
       }
     } catch (err) {
       console.error("Evaluation error:", err);
-      // Ensure smooth progression even if network hiccups
       const updatedSession = SessionManager.getActiveSession() || session;
       const nextIndex = updatedSession.currentQuestionIndex + 1;
       if (nextIndex < updatedSession.questions.length) {
         updatedSession.currentQuestionIndex = nextIndex;
         SessionManager.saveSession(updatedSession);
-        setSession(updatedSession);
+        setSession({ ...updatedSession });
         setIsEvaluating(false);
         setAvatarState("idle");
       } else {
@@ -246,7 +254,7 @@ export default function InterviewSessionPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
       </div>
     );
@@ -265,14 +273,15 @@ export default function InterviewSessionPage() {
         onEndInterview={handleEndInterview}
       />
 
-      {/* Main Interactive Stage */}
-      <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 flex flex-col items-center justify-between space-y-6">
+      {/* Main Interactive Stage (Mobile-Optimized Padding) */}
+      <div className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-8 flex flex-col items-center justify-between space-y-4 sm:space-y-6">
         {/* Prominent AI Avatar */}
         <AIAvatar
           state={avatarState}
           interviewerName="Alex"
           roleTitle={`${session.options.role} Interviewer`}
           caption={captionText}
+          className="p-2 sm:p-6"
         />
 
         {/* Current Question */}
@@ -286,25 +295,27 @@ export default function InterviewSessionPage() {
 
         {/* Loading / Evaluating Status Overlay */}
         {(isEvaluating || isCompletedTransition) && (
-          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-purple-950/50 border border-purple-500/30 text-purple-200 text-xs animate-pulse shadow-lg">
+          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs animate-pulse shadow-lg">
             {isCompletedTransition ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
-              <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+              <Loader2 className="w-4 h-4 animate-spin text-purple-400 shrink-0" />
             )}
-            <span className="font-medium">{statusMessage}</span>
+            <span className="font-medium text-center">{statusMessage}</span>
           </div>
         )}
 
         {/* Input Interface */}
         {!isCompletedTransition && (
-          <AnswerInput
-            isListening={isListening}
-            onToggleListening={handleToggleListening}
-            onSubmitAnswer={handleSubmitAnswer}
-            disabled={isEvaluating || avatarState === "speaking"}
-            externalTranscript={voiceTranscript}
-          />
+          <div className="w-full">
+            <AnswerInput
+              isListening={isListening}
+              onToggleListening={handleToggleListening}
+              onSubmitAnswer={handleSubmitAnswer}
+              disabled={isEvaluating || avatarState === "speaking"}
+              externalTranscript={voiceTranscript}
+            />
+          </div>
         )}
       </div>
     </div>

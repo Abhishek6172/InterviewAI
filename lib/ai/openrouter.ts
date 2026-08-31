@@ -35,10 +35,8 @@ export class OpenRouterAIService implements AIService {
   private cleanAndParseJSON(rawContent: string): any {
     if (!rawContent) throw new Error("Empty response from OpenRouter");
 
-    // 1. Remove markdown code fences
     let text = rawContent.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-    // 2. Locate first '{' and last '}'
     const firstOpen = text.indexOf("{");
     const lastClose = text.lastIndexOf("}");
     if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
@@ -48,7 +46,11 @@ export class OpenRouterAIService implements AIService {
     return JSON.parse(text);
   }
 
-  private async callOpenRouter(systemInstruction: string, promptText: string): Promise<any> {
+  private async callOpenRouter(
+    systemInstruction: string,
+    promptText: string,
+    maxTokens: number = 750
+  ): Promise<any> {
     const url = `${this.baseUrl}/chat/completions`;
     const modelsToTry = [
       this.primaryModel,
@@ -61,9 +63,12 @@ export class OpenRouterAIService implements AIService {
 
     for (const model of modelsToTry) {
       try {
-        console.log(`[InterviewAI] Calling OpenRouter Model: ${model}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout for fast response
+
         const response = await fetch(url, {
           method: "POST",
+          signal: controller.signal,
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${this.apiKey}`,
@@ -72,56 +77,51 @@ export class OpenRouterAIService implements AIService {
           },
           body: JSON.stringify({
             model,
+            max_tokens: maxTokens,
             messages: [
               {
                 role: "system",
-                content: systemInstruction + "\nYou MUST return strictly valid JSON.",
+                content: systemInstruction + "\nYou MUST output strictly valid JSON.",
               },
               {
                 role: "user",
                 content: promptText,
               },
             ],
-            temperature: 0.6,
+            temperature: 0.5,
           }),
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
-          const errText = await response.text();
-          console.warn(`[InterviewAI] OpenRouter Model ${model} returned status ${response.status}: ${errText.slice(0, 150)}`);
           continue;
         }
 
         const data = await response.json();
         const rawContent = data?.choices?.[0]?.message?.content;
-        if (!rawContent) {
-          console.warn(`[InterviewAI] OpenRouter Model ${model} returned empty content.`);
-          continue;
-        }
+        if (!rawContent) continue;
 
         const parsed = this.cleanAndParseJSON(rawContent);
-        console.log(`[InterviewAI] Successfully received and parsed response from ${model}`);
         return parsed;
       } catch (err: any) {
-        console.warn(`[InterviewAI] OpenRouter Model ${model} failed:`, err?.message || err);
         lastError = err;
       }
     }
 
-    throw lastError || new Error("All OpenRouter models failed to respond with valid JSON");
+    throw lastError || new Error("All OpenRouter models timed out or failed");
   }
 
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
     try {
       const prompt = createQuestionsPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 800);
 
       if (parsed?.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
         return { questions: parsed.questions };
       }
       throw new Error("Invalid questions schema from OpenRouter");
     } catch (err) {
-      console.warn("[InterviewAI] OpenRouter question generation fallback triggered:", err);
       return this.fallbackService.generateQuestions(req);
     }
   }
@@ -129,7 +129,7 @@ export class OpenRouterAIService implements AIService {
   async evaluateAnswer(req: EvaluateAnswerRequest): Promise<EvaluateAnswerResponse> {
     try {
       const prompt = createEvaluationPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 450);
 
       if (parsed?.evaluation) {
         let followUpQuestion = undefined;
@@ -149,7 +149,6 @@ export class OpenRouterAIService implements AIService {
       }
       throw new Error("Invalid evaluation schema from OpenRouter");
     } catch (err) {
-      console.warn("[InterviewAI] OpenRouter answer evaluation fallback triggered:", err);
       return this.fallbackService.evaluateAnswer(req);
     }
   }
@@ -157,14 +156,13 @@ export class OpenRouterAIService implements AIService {
   async generateScorecard(req: GenerateScorecardRequest): Promise<GenerateScorecardResponse> {
     try {
       const prompt = createScorecardPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 950);
 
       if (parsed?.scorecard) {
         return { scorecard: parsed.scorecard };
       }
       throw new Error("Invalid scorecard schema from OpenRouter");
     } catch (err) {
-      console.warn("[InterviewAI] OpenRouter scorecard generation fallback triggered:", err);
       return this.fallbackService.generateScorecard(req);
     }
   }
