@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
@@ -30,6 +30,10 @@ import {
   Sparkle,
   Clock,
   Zap,
+  FileText,
+  UploadCloud,
+  X,
+  FileCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -92,12 +96,59 @@ export default function InterviewSetupPage() {
   const [selectedExperience, setSelectedExperience] = useState<ExperienceLevel>("Fresher");
   const [questionCount, setQuestionCount] = useState<number>(5);
 
+  // Resume Upload State
+  const [resumeText, setResumeText] = useState<string>("");
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [showResumeInput, setShowResumeInput] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     AnalyticsTracker.track("setup_started");
   }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingResume(true);
+    setErrorMsg(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/resume/parse", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success && data.text) {
+        setResumeText(data.text);
+        setResumeFileName(file.name);
+        setShowResumeInput(true);
+      } else {
+        throw new Error(data.error || "Failed to parse resume");
+      }
+    } catch (err: any) {
+      console.error("Resume upload error:", err);
+      setErrorMsg("Could not extract text from document. You can paste your resume or project details in the text box below.");
+      setShowResumeInput(true);
+    } finally {
+      setIsUploadingResume(false);
+    }
+  };
+
+  const handleClearResume = () => {
+    setResumeText("");
+    setResumeFileName(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleStartInterview = async () => {
     const finalRole = isCustomRole ? customRoleInput.trim() : selectedRole;
@@ -117,6 +168,8 @@ export default function InterviewSetupPage() {
       experienceLevel: selectedExperience,
       questionCount,
       includeFollowUps: true,
+      resumeText: resumeText.trim() || undefined,
+      resumeFileName: resumeFileName || undefined,
     };
 
     try {
@@ -129,6 +182,7 @@ export default function InterviewSetupPage() {
           interviewType: selectedType,
           experienceLevel: selectedExperience,
           count: questionCount,
+          resumeText: resumeText.trim() || undefined,
         }),
       });
 
@@ -149,6 +203,7 @@ export default function InterviewSetupPage() {
           interviewType: selectedType,
           experienceLevel: selectedExperience,
           questionCount,
+          hasResume: Boolean(resumeText.trim()),
         },
         session.id
       );
@@ -199,7 +254,7 @@ export default function InterviewSetupPage() {
             Back to Home
           </Button>
         </Link>
-        <Badge variant="outline" className="text-xs text-slate-400">
+        <Badge variant="outline" className="text-xs text-purple-400 border-purple-500/30">
           Fast 60-Second Setup
         </Badge>
       </div>
@@ -209,7 +264,7 @@ export default function InterviewSetupPage() {
           Configure Your Mock Interview
         </h1>
         <p className="text-sm text-slate-400 max-w-xl mx-auto">
-          Tailor the AI interviewer to simulate the exact position, seniority, and style of your target company.
+          Tailor the AI interviewer to simulate the exact position, seniority, resume projects, and style of your target company.
         </p>
       </div>
 
@@ -222,7 +277,7 @@ export default function InterviewSetupPage() {
       {/* 1. Target Role */}
       <div className="space-y-3">
         <label className="text-sm font-semibold text-white flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
+          <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
             1
           </span>
           Target Role
@@ -241,15 +296,15 @@ export default function InterviewSetupPage() {
                 }}
                 className={`flex flex-col text-left p-4 rounded-2xl border transition-all duration-200 ${
                   isSelected
-                    ? "bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10 ring-1 ring-blue-500"
+                    ? "bg-purple-600/20 border-purple-500 text-white shadow-lg shadow-purple-500/15 ring-1 ring-purple-500"
                     : "glass-panel border-white/5 text-slate-300 hover:border-white/20 hover:bg-white/5"
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`p-2 rounded-xl ${isSelected ? "bg-blue-500 text-white" : "bg-white/5 text-slate-400"}`}>
+                  <div className={`p-2 rounded-xl ${isSelected ? "bg-purple-500 text-white" : "bg-white/5 text-slate-400"}`}>
                     <Icon className="w-4 h-4" />
                   </div>
-                  {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
+                  {isSelected && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
                 </div>
                 <span className="text-sm font-semibold mb-1">{r.role}</span>
                 <span className="text-xs text-muted-foreground leading-relaxed">{r.desc}</span>
@@ -263,15 +318,15 @@ export default function InterviewSetupPage() {
             onClick={() => setIsCustomRole(true)}
             className={`flex flex-col text-left p-4 rounded-2xl border transition-all duration-200 ${
               isCustomRole
-                ? "bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-500/10 ring-1 ring-blue-500"
+                ? "bg-purple-600/20 border-purple-500 text-white shadow-lg shadow-purple-500/15 ring-1 ring-purple-500"
                 : "glass-panel border-white/5 text-slate-300 hover:border-white/20 hover:bg-white/5"
             }`}
           >
             <div className="flex items-center justify-between mb-2">
-              <div className={`p-2 rounded-xl ${isCustomRole ? "bg-blue-500 text-white" : "bg-white/5 text-slate-400"}`}>
+              <div className={`p-2 rounded-xl ${isCustomRole ? "bg-purple-500 text-white" : "bg-white/5 text-slate-400"}`}>
                 <Edit3 className="w-4 h-4" />
               </div>
-              {isCustomRole && <CheckCircle2 className="w-4 h-4 text-blue-400" />}
+              {isCustomRole && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
             </div>
             <span className="text-sm font-semibold mb-1">Custom Role</span>
             <span className="text-xs text-muted-foreground leading-relaxed">
@@ -282,25 +337,125 @@ export default function InterviewSetupPage() {
 
         {/* Custom Role Input */}
         {isCustomRole && (
-          <div className="p-4 rounded-2xl glass-panel border border-blue-500/30 space-y-2 animate-in fade-in slide-in-from-top-2">
-            <label className="text-xs font-semibold text-blue-400">Specify Custom Job Role Title:</label>
+          <div className="p-4 rounded-2xl glass-panel border border-purple-500/30 space-y-2 animate-in fade-in slide-in-from-top-2">
+            <label className="text-xs font-semibold text-purple-400">Specify Custom Job Role Title:</label>
             <input
               type="text"
               value={customRoleInput}
               onChange={(e) => setCustomRoleInput(e.target.value)}
               placeholder="e.g. Cloud Security Engineer, iOS Developer, Machine Learning Intern"
-              className="w-full rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
               autoFocus
             />
           </div>
         )}
       </div>
 
-      {/* 2. Interview Type */}
+      {/* 2. Resume & Project Context (New) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-semibold text-white flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
+              2
+            </span>
+            Upload Resume / Project Background (Optional)
+          </label>
+          <span className="text-[11px] text-purple-300">The AI will question your actual projects</span>
+        </div>
+
+        <Card className="glass-panel border-white/10 p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/25">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-semibold text-white block">
+                  {resumeFileName ? resumeFileName : "Upload your resume (.pdf, .txt, .docx)"}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {resumeFileName
+                    ? `${resumeText.length} characters parsed & ready`
+                    : "The LLM will generate targeted questions referencing your past work & technologies"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.txt,.md,.doc,.docx"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="resume-upload"
+              />
+              <label htmlFor="resume-upload" className="w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploadingResume}
+                  className="w-full sm:w-auto gap-2 text-xs border-purple-500/30 hover:border-purple-500/60 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploadingResume ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                      Parsing Document...
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className="w-3.5 h-3.5 text-purple-400" />
+                      {resumeFileName ? "Replace File" : "Choose Resume File"}
+                    </>
+                  )}
+                </Button>
+              </label>
+
+              {resumeText && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearResume}
+                  className="text-xs text-red-400 hover:text-red-300"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Editable Resume Text Area */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-300">
+                Or paste your resume, project details, or LinkedIn summary:
+              </span>
+              {resumeText && (
+                <Badge variant="success" className="text-[10px] gap-1">
+                  <FileCheck className="w-3 h-3" /> Resume Active
+                </Badge>
+              )}
+            </div>
+            <textarea
+              value={resumeText}
+              onChange={(e) => setResumeText(e.target.value)}
+              placeholder="Paste work experience, past tech projects, internships, or achievements here (e.g., 'Built an e-commerce microservice with Node.js, Redis and PostgreSQL, reducing latency by 40%...')"
+              rows={showResumeInput || resumeText ? 4 : 2}
+              className="w-full rounded-xl bg-white/5 border border-white/10 p-3 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-purple-500 font-mono transition-all"
+            />
+          </div>
+        </Card>
+      </div>
+
+      {/* 3. Interview Type */}
       <div className="space-y-3">
         <label className="text-sm font-semibold text-white flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
-            2
+          <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
+            3
           </span>
           Interview Type
         </label>
@@ -314,13 +469,13 @@ export default function InterviewSetupPage() {
                 onClick={() => setSelectedType(t.type)}
                 className={`p-4 rounded-2xl border text-left transition-all ${
                   isSelected
-                    ? "bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500"
+                    ? "bg-purple-600/20 border-purple-500 text-white shadow-lg shadow-purple-500/15 ring-1 ring-purple-500"
                     : "glass-panel border-white/5 text-slate-300 hover:border-white/20 hover:bg-white/5"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-semibold">{t.label}</span>
-                  {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-400" />}
+                  {isSelected && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
                 </div>
                 <span className="text-xs text-muted-foreground">{t.desc}</span>
               </button>
@@ -329,11 +484,11 @@ export default function InterviewSetupPage() {
         </div>
       </div>
 
-      {/* 3. Difficulty */}
+      {/* 4. Difficulty */}
       <div className="space-y-3">
         <label className="text-sm font-semibold text-white flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
-            3
+          <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
+            4
           </span>
           Difficulty
         </label>
@@ -347,7 +502,7 @@ export default function InterviewSetupPage() {
                 onClick={() => setSelectedDifficulty(d.level)}
                 className={`p-4 rounded-2xl border text-left transition-all ${
                   isSelected
-                    ? "bg-purple-600/20 border-purple-500 text-white shadow-lg shadow-purple-500/10 ring-1 ring-purple-500"
+                    ? "bg-purple-600/20 border-purple-500 text-white shadow-lg shadow-purple-500/15 ring-1 ring-purple-500"
                     : "glass-panel border-white/5 text-slate-300 hover:border-white/20 hover:bg-white/5"
                 }`}
               >
@@ -362,13 +517,13 @@ export default function InterviewSetupPage() {
         </div>
       </div>
 
-      {/* 4. Experience Level */}
+      {/* 5. Experience Level */}
       <div className="space-y-3">
         <label className="text-sm font-semibold text-white flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">
-            4
+          <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">
+            5
           </span>
-          Experience Level (Optional Context)
+          Experience Level
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {EXPERIENCE_LEVELS.map((exp) => {
@@ -381,13 +536,13 @@ export default function InterviewSetupPage() {
                 onClick={() => setSelectedExperience(exp.level)}
                 className={`p-3 rounded-2xl border text-left transition-all ${
                   isSelected
-                    ? "bg-blue-600/20 border-blue-500 text-white shadow-md ring-1 ring-blue-500"
+                    ? "bg-purple-600/20 border-purple-500 text-white shadow-md ring-1 ring-purple-500"
                     : "glass-panel border-white/5 text-slate-300 hover:border-white/20 hover:bg-white/5"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold">{exp.level}</span>
-                  <Icon className="w-3.5 h-3.5 text-blue-400" />
+                  <Icon className="w-3.5 h-3.5 text-purple-400" />
                 </div>
                 <span className="text-[10px] text-muted-foreground">{exp.desc}</span>
               </button>
@@ -396,7 +551,7 @@ export default function InterviewSetupPage() {
         </div>
       </div>
 
-      {/* 5. Number of Questions */}
+      {/* 6. Number of Questions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl glass-panel border border-white/5 gap-3">
         <div>
           <span className="text-xs font-semibold text-white block">Number of Questions</span>
@@ -430,7 +585,7 @@ export default function InterviewSetupPage() {
           {isLoading ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Starting AI Interview...
+              Generating Tailored AI Interview...
             </>
           ) : (
             <>
@@ -441,7 +596,7 @@ export default function InterviewSetupPage() {
           )}
         </Button>
         <span className="text-xs text-slate-500 mt-2">
-          You will interact with an adaptive AI avatar &bull; Voice & typing supported
+          Powered by real-time LLM reasoning &bull; Voice & typing supported
         </span>
       </div>
     </div>

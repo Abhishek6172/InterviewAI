@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       interviewType: body.interviewType,
       experienceLevel: body.experienceLevel || "Fresher",
       count: Number(body.count) || 5,
+      resumeText: body.resumeText || "",
       conversationHistory: body.conversationHistory || [],
     });
 

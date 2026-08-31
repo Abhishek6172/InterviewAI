@@ -160,6 +160,7 @@ export default function InterviewSessionPage() {
           experienceLevel: session.options.experienceLevel,
           question: currentQ,
           userAnswer: answerText,
+          resumeText: session.options.resumeText || "",
           conversationHistory: history,
           canFollowUp: !currentQ.isFollowUp && session.currentQuestionIndex < session.questions.length - 1,
         }),
@@ -204,6 +205,7 @@ export default function InterviewSessionPage() {
             questions: updatedSession.questions,
             answers: updatedSession.answers,
             evaluations: updatedSession.evaluations,
+            resumeText: updatedSession.options.resumeText || "",
           }),
         });
 
@@ -245,7 +247,7 @@ export default function InterviewSessionPage() {
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
       </div>
     );
   }

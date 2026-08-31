@@ -1,5 +1,5 @@
 /**
- * Core Data Models for InterviewAI - Stage 2
+ * Core Data Models for InterviewAI
  */
 
 export type InterviewRole =
@@ -26,6 +26,8 @@ export interface InterviewSetupOptions {
   experienceLevel: ExperienceLevel;
   questionCount: number; // 3 (quick test), 5, 8, 10
   includeFollowUps: boolean;
+  resumeText?: string; // Optional Candidate Resume / Project Details
+  resumeFileName?: string;
 }
 
 export interface InterviewQuestion {

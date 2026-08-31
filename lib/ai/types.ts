@@ -22,6 +22,7 @@ export interface GenerateQuestionsRequest {
   interviewType: InterviewType;
   experienceLevel: ExperienceLevel;
   count: number;
+  resumeText?: string;
   conversationHistory?: ConversationTurn[];
 }
 
@@ -36,6 +37,7 @@ export interface EvaluateAnswerRequest {
   experienceLevel: ExperienceLevel;
   question: InterviewQuestion;
   userAnswer: string;
+  resumeText?: string;
   conversationHistory?: ConversationTurn[];
   canFollowUp?: boolean;
 }
@@ -53,6 +55,7 @@ export interface GenerateScorecardRequest {
   questions: InterviewQuestion[];
   answers: Record<string, { answerText: string; durationSeconds: number }>;
   evaluations: Record<string, QuestionEvaluation>;
+  resumeText?: string;
 }
 
 export interface GenerateScorecardResponse {

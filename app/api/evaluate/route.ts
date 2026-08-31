@@ -17,6 +17,7 @@ export async function POST(req: Request) {
         questions: body.questions || [],
         answers: body.answers || {},
         evaluations: body.evaluations || {},
+        resumeText: body.resumeText || "",
       };
 
       const result = await aiService.generateScorecard(scorecardReq);
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
       experienceLevel: body.experienceLevel || "Fresher",
       question: body.question,
       userAnswer: body.userAnswer || "",
+      resumeText: body.resumeText || "",
       conversationHistory: body.conversationHistory || [],
       canFollowUp: body.canFollowUp !== undefined ? body.canFollowUp : true,
     };

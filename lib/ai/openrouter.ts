@@ -18,25 +18,50 @@ import { MockAIService } from "./mock";
 export class OpenRouterAIService implements AIService {
   private apiKey: string;
   private baseUrl: string;
-  private model: string;
+  private primaryModel: string;
   private fallbackService: MockAIService;
 
   constructor(
     apiKey: string,
     baseUrl: string = "https://openrouter.ai/api/v1",
-    model: string = "google/gemini-2.0-flash-001"
+    primaryModel: string = "liquid/lfm-2.5-2.6b:free"
   ) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/+$/, "");
-    this.model = model;
+    this.primaryModel = primaryModel;
     this.fallbackService = new MockAIService();
   }
 
-  private async callOpenRouter(systemInstruction: string, promptText: string, retries = 1): Promise<any> {
-    const url = `${this.baseUrl}/chat/completions`;
+  private cleanAndParseJSON(rawContent: string): any {
+    if (!rawContent) throw new Error("Empty response from OpenRouter");
 
-    for (let attempt = 0; attempt <= retries; attempt++) {
+    // 1. Remove markdown code fences
+    let text = rawContent.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+    // 2. Locate first '{' and last '}'
+    const firstOpen = text.indexOf("{");
+    const lastClose = text.lastIndexOf("}");
+    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+      text = text.substring(firstOpen, lastClose + 1);
+    }
+
+    return JSON.parse(text);
+  }
+
+  private async callOpenRouter(systemInstruction: string, promptText: string): Promise<any> {
+    const url = `${this.baseUrl}/chat/completions`;
+    const modelsToTry = [
+      this.primaryModel,
+      "nvidia/nemotron-3.5-lightning:free",
+      "google/gemini-2.0-flash-001",
+      "meta-llama/llama-3.3-70b-instruct",
+    ];
+
+    let lastError: any = null;
+
+    for (const model of modelsToTry) {
       try {
+        console.log(`[InterviewAI] Calling OpenRouter Model: ${model}`);
         const response = await fetch(url, {
           method: "POST",
           headers: {
@@ -46,44 +71,44 @@ export class OpenRouterAIService implements AIService {
             "X-Title": "InterviewAI",
           },
           body: JSON.stringify({
-            model: this.model,
-            response_format: { type: "json_object" },
+            model,
             messages: [
               {
                 role: "system",
-                content: systemInstruction + "\nYou MUST return valid JSON adhering to the specified schema.",
+                content: systemInstruction + "\nYou MUST return strictly valid JSON.",
               },
               {
                 role: "user",
                 content: promptText,
               },
             ],
-            temperature: 0.65,
+            temperature: 0.6,
           }),
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`OpenRouter API Error (${response.status}): ${errorText}`);
+          const errText = await response.text();
+          console.warn(`[InterviewAI] OpenRouter Model ${model} returned status ${response.status}: ${errText.slice(0, 150)}`);
+          continue;
         }
 
         const data = await response.json();
         const rawContent = data?.choices?.[0]?.message?.content;
         if (!rawContent) {
-          throw new Error("No content returned from OpenRouter");
+          console.warn(`[InterviewAI] OpenRouter Model ${model} returned empty content.`);
+          continue;
         }
 
-        // Clean out possible markdown codeblocks
-        const cleaned = rawContent.replace(/```json/gi, "").replace(/```/g, "").trim();
-        return JSON.parse(cleaned);
-      } catch (err) {
-        console.warn(`OpenRouter attempt ${attempt + 1} failed:`, err);
-        if (attempt === retries) {
-          throw err;
-        }
-        await new Promise((r) => setTimeout(r, 600));
+        const parsed = this.cleanAndParseJSON(rawContent);
+        console.log(`[InterviewAI] Successfully received and parsed response from ${model}`);
+        return parsed;
+      } catch (err: any) {
+        console.warn(`[InterviewAI] OpenRouter Model ${model} failed:`, err?.message || err);
+        lastError = err;
       }
     }
+
+    throw lastError || new Error("All OpenRouter models failed to respond with valid JSON");
   }
 
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
@@ -96,7 +121,7 @@ export class OpenRouterAIService implements AIService {
       }
       throw new Error("Invalid questions schema from OpenRouter");
     } catch (err) {
-      console.warn("OpenRouter question generation error, falling back to mock:", err);
+      console.warn("[InterviewAI] OpenRouter question generation fallback triggered:", err);
       return this.fallbackService.generateQuestions(req);
     }
   }
@@ -124,7 +149,7 @@ export class OpenRouterAIService implements AIService {
       }
       throw new Error("Invalid evaluation schema from OpenRouter");
     } catch (err) {
-      console.warn("OpenRouter evaluation error, falling back to mock:", err);
+      console.warn("[InterviewAI] OpenRouter answer evaluation fallback triggered:", err);
       return this.fallbackService.evaluateAnswer(req);
     }
   }
@@ -139,7 +164,7 @@ export class OpenRouterAIService implements AIService {
       }
       throw new Error("Invalid scorecard schema from OpenRouter");
     } catch (err) {
-      console.warn("OpenRouter scorecard generation error, falling back to mock:", err);
+      console.warn("[InterviewAI] OpenRouter scorecard generation fallback triggered:", err);
       return this.fallbackService.generateScorecard(req);
     }
   }
