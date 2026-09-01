@@ -22,6 +22,27 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Prioritize configured NEXTAUTH_URL or Vercel URL
+      const appBase = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : baseUrl);
+      
+      // Relative path callback (e.g. /profile, /interview/setup)
+      if (url.startsWith("/")) {
+        return `${appBase}${url}`;
+      }
+      
+      try {
+        const urlObj = new URL(url);
+        const baseObj = new URL(appBase);
+        if (urlObj.hostname === baseObj.hostname || urlObj.origin === baseObj.origin) {
+          return url;
+        }
+      } catch {
+        // invalid URL
+      }
+      
+      return appBase;
+    },
     async session({ session, token }) {
       if (session?.user && token?.sub) {
         (session.user as any).id = token.sub;
