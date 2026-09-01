@@ -1,6 +1,8 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
+const PRODUCTION_URL = "https://interview-ai-five-weld.vercel.app";
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -23,14 +25,19 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Prioritize configured NEXTAUTH_URL or Vercel URL
-      const appBase = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : baseUrl);
+      // Determine production base URL
+      let appBase = process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : baseUrl);
       
-      // Relative path callback (e.g. /profile, /interview/setup)
+      // If baseUrl or appBase is localhost in production, override to Vercel production URL
+      if (process.env.NODE_ENV === "production" && appBase.includes("localhost")) {
+        appBase = PRODUCTION_URL;
+      }
+
+      // Handle relative paths (e.g. /profile, /interview/setup)
       if (url.startsWith("/")) {
         return `${appBase}${url}`;
       }
-      
+
       try {
         const urlObj = new URL(url);
         const baseObj = new URL(appBase);
@@ -38,9 +45,9 @@ export const authOptions: NextAuthOptions = {
           return url;
         }
       } catch {
-        // invalid URL
+        // invalid URL fallback
       }
-      
+
       return appBase;
     },
     async session({ session, token }) {
