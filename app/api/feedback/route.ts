@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { ValidationFeedback } from "@/types/analytics";
 import { submitToGoogleForm, GOOGLE_FORM_CONFIG } from "@/lib/config/google-form";
 
-// In-memory feedback records for fast prototype validation
-const feedbackStore: ValidationFeedback[] = [];
+// In-memory feedback store (starts empty with no past feedback)
+let feedbackStore: ValidationFeedback[] = [];
 
 export async function POST(req: Request) {
   try {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       googleFormSynced: googleSynced,
     };
 
-    feedbackStore.push(newFeedback);
+    feedbackStore.unshift(newFeedback);
 
     return NextResponse.json({
       success: true,
@@ -65,4 +65,30 @@ export async function GET() {
     total: feedbackStore.length,
     feedbacks: feedbackStore,
   });
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+
+    if (body.clearAll) {
+      feedbackStore = [];
+      return NextResponse.json({
+        success: true,
+        message: "All feedback records cleared successfully",
+      });
+    }
+
+    if (body.feedbackId) {
+      feedbackStore = feedbackStore.filter((f) => f.id !== body.feedbackId);
+      return NextResponse.json({
+        success: true,
+        message: `Feedback ${body.feedbackId} deleted successfully`,
+      });
+    }
+
+    return NextResponse.json({ error: "Missing feedbackId or clearAll flag" }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: "Failed to delete feedback" }, { status: 500 });
+  }
 }

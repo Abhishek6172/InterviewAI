@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Award,
 } from "lucide-react";
+import { isAdmin } from "@/lib/auth/admin";
 
 interface UserMenuProps {
   onSignInRequired?: () => void;
@@ -152,6 +153,17 @@ export function UserMenu({ onSignInRequired }: UserMenuProps) {
           </div>
 
           {/* Navigation Links */}
+          {isAdmin(user.email) && (
+            <Link
+              href="/admin"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-purple-300 bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/30 transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-400" />
+              <span>👑 Super Admin Portal</span>
+            </Link>
+          )}
+
           <Link
             href="/profile"
             onClick={() => setIsOpen(false)}

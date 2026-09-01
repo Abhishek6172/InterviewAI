@@ -43,7 +43,7 @@ export class AnalyticsTracker {
       try {
         const stored = localStorage.getItem(FEEDBACK_STORAGE_KEY);
         const feedbacks: ValidationFeedback[] = stored ? JSON.parse(stored) : [];
-        feedbacks.push(feedback);
+        feedbacks.unshift(feedback);
         localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
       } catch (err) {
         console.warn("Could not save validation feedback locally:", err);
@@ -58,6 +58,25 @@ export class AnalyticsTracker {
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
+    }
+  }
+
+  public static deleteFeedback(feedbackId: string): void {
+    if (typeof window === "undefined") return;
+    try {
+      const feedbacks = this.getStoredFeedback().filter((f) => f.id !== feedbackId);
+      localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
+    } catch (err) {
+      console.warn("Error deleting feedback:", err);
+    }
+  }
+
+  public static clearAllFeedback(): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(FEEDBACK_STORAGE_KEY);
+    } catch {
+      // ignore
     }
   }
 
