@@ -25,6 +25,8 @@ import {
   BarChart3,
   FileCheck,
   Clock,
+  KeyRound,
+  ExternalLink,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -54,6 +56,12 @@ export default function ProfilePage() {
     if (confirm("Are you sure you want to clear all your interview history and scores? This cannot be undone.")) {
       SessionManager.clearAllHistory();
       loadHistory();
+    }
+  };
+
+  const handleSignOut = () => {
+    if (confirm("Are you sure you want to log out of InterviewAI?")) {
+      signOut({ callbackUrl: "/" });
     }
   };
 
@@ -177,9 +185,10 @@ export default function ProfilePage() {
               </Button>
             </Link>
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={handleSignOut}
               className="gap-1.5 text-xs text-rose-400 border-rose-500/20 hover:bg-rose-500/10"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -263,8 +272,9 @@ export default function ProfilePage() {
           <div className="space-y-3">
             {history.map((item, idx) => {
               const score = item.scorecard?.overallScore;
-              const dateStr = item.createdAt && !isNaN(new Date(item.createdAt).getTime())
-                ? new Date(item.createdAt).toLocaleDateString("en-US", {
+              const dateRaw = item.createdAt || item.startedAt || item.completedAt;
+              const dateStr = dateRaw && !isNaN(new Date(dateRaw).getTime())
+                ? new Date(dateRaw).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
@@ -372,6 +382,32 @@ export default function ProfilePage() {
           </Card>
         )}
       </div>
+
+      {/* Account Security & Sign Out Section */}
+      <Card className="glass-panel border-white/10 p-6 sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="space-y-1.5">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-purple-400" />
+              Account Security & Session Management
+            </h3>
+            <p className="text-xs text-slate-400">
+              You are signed in with Google as <span className="text-white font-medium">{user.email}</span>. Your session remains persistently active until you log out.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="destructive"
+            size="default"
+            onClick={handleSignOut}
+            className="gap-2 text-xs sm:text-sm shrink-0 shadow-lg shadow-rose-950/40"
+          >
+            <LogOut className="w-4 h-4" />
+            Log Out of InterviewAI
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }

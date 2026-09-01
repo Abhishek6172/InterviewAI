@@ -3,6 +3,9 @@ import GoogleProvider from "next-auth/providers/google";
 
 const PRODUCTION_URL = "https://interview-ai-five-weld.vercel.app";
 
+// 90 Days session retention so users stay logged in until explicit logout
+const NINETY_DAYS_IN_SECONDS = 90 * 24 * 60 * 60;
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -21,7 +24,23 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || "interviewai-default-secret-production-key",
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: NINETY_DAYS_IN_SECONDS,
+    updateAge: 24 * 60 * 60, // Refresh token daily when active
+  },
+  jwt: {
+    maxAge: NINETY_DAYS_IN_SECONDS,
+  },
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === "production" ? "__Secure-next-auth.session-token" : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: NINETY_DAYS_IN_SECONDS,
+      },
+    },
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
