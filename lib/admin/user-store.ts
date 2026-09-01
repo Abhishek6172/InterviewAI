@@ -24,12 +24,14 @@ export interface AppUser {
   sessions?: CandidateSessionRecord[];
 }
 
-const USERS_STORAGE_KEY = "interviewai_registered_users_v2";
+const USERS_STORAGE_KEY = "interviewai_registered_users_v3";
+const DELETED_USERS_KEY = "interviewai_deleted_users_v3";
 
-// Server-side persistent user map
+// In-memory server cache
 let serverUserMap: Map<string, AppUser> = new Map();
+let deletedUsersSet: Set<string> = new Set();
 
-// Initialize Admin
+// Initialize Admin profile
 const defaultAdmin: AppUser = {
   id: "admin_super",
   name: "Abhishek Kumar Das Pattanayak",
@@ -50,7 +52,10 @@ const defaultAdmin: AppUser = {
     },
   ],
 };
-serverUserMap.set(defaultAdmin.email.toLowerCase(), defaultAdmin);
+
+if (!deletedUsersSet.has(defaultAdmin.email.toLowerCase())) {
+  serverUserMap.set(defaultAdmin.email.toLowerCase(), defaultAdmin);
+}
 
 export class UserStore {
   public static upsertUser(user: {
@@ -64,6 +69,10 @@ export class UserStore {
     if (!user.email) return null;
 
     const email = user.email.trim().toLowerCase();
+    if (deletedUsersSet.has(email) && email !== defaultAdmin.email.toLowerCase()) {
+      return null;
+    }
+
     const now = new Date().toISOString();
     const existing = serverUserMap.get(email);
 
@@ -93,7 +102,7 @@ export class UserStore {
 
     serverUserMap.set(email, updatedUser);
 
-    // Save to client localStorage
+    // Client localStorage retention
     if (typeof window !== "undefined") {
       try {
         const localList = this.getClientUsers();
@@ -102,7 +111,7 @@ export class UserStore {
         map.set(email, updatedUser);
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(Array.from(map.values())));
       } catch (err) {
-        console.warn("Client localStorage sync error:", err);
+        console.warn("Client localStorage save error:", err);
       }
     }
 
@@ -144,36 +153,49 @@ export class UserStore {
   }
 
   public static getServerUsers(): AppUser[] {
-    return Array.from(serverUserMap.values());
+    return Array.from(serverUserMap.values()).filter((u) => !deletedUsersSet.has(u.email.toLowerCase()));
   }
 
   public static getClientUsers(): AppUser[] {
-    if (typeof window === "undefined") return Array.from(serverUserMap.values());
+    if (typeof window === "undefined") return this.getServerUsers();
     try {
+      const deletedStr = localStorage.getItem(DELETED_USERS_KEY);
+      const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+      const delSet = new Set(deleted.map((e) => e.toLowerCase()));
+
       const data = localStorage.getItem(USERS_STORAGE_KEY);
       if (!data) {
-        const init = Array.from(serverUserMap.values());
+        const init = this.getServerUsers().filter((u) => !delSet.has(u.email.toLowerCase()));
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(init));
         return init;
       }
       const parsed: AppUser[] = JSON.parse(data);
-      if (!parsed.some((u) => u.email.toLowerCase() === defaultAdmin.email.toLowerCase())) {
-        parsed.unshift(defaultAdmin);
+      const filtered = parsed.filter((u) => !delSet.has(u.email.toLowerCase()));
+      if (!filtered.some((u) => u.email.toLowerCase() === defaultAdmin.email.toLowerCase()) && !delSet.has(defaultAdmin.email.toLowerCase())) {
+        filtered.unshift(defaultAdmin);
       }
-      return parsed;
+      return filtered;
     } catch {
-      return Array.from(serverUserMap.values());
+      return this.getServerUsers();
     }
   }
 
   public static deleteUser(email: string): void {
     const cleanEmail = email.trim().toLowerCase();
     serverUserMap.delete(cleanEmail);
+    deletedUsersSet.add(cleanEmail);
 
     if (typeof window !== "undefined") {
       try {
         const local = this.getClientUsers().filter((u) => u.email.toLowerCase() !== cleanEmail);
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(local));
+
+        const deletedStr = localStorage.getItem(DELETED_USERS_KEY);
+        const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+        if (!deleted.includes(cleanEmail)) {
+          deleted.push(cleanEmail);
+          localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(deleted));
+        }
       } catch {
         // ignore
       }
