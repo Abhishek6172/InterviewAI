@@ -39,7 +39,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { SignInModal } from "@/components/auth/SignInModal";
 
 const STANDARD_ROLES: { role: string; icon: any; desc: string }[] = [
   {
@@ -89,6 +91,7 @@ const EXPERIENCE_LEVELS: { level: ExperienceLevel; icon: any; desc: string }[] =
 ];
 
 export default function InterviewSetupPage() {
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   const [selectedRole, setSelectedRole] = useState<string>("Software Engineer");
@@ -111,10 +114,14 @@ export default function InterviewSetupPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     AnalyticsTracker.track("setup_started");
-  }, []);
+    if (status === "unauthenticated") {
+      setShowAuthModal(true);
+    }
+  }, [status]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -158,6 +165,11 @@ export default function InterviewSetupPage() {
   };
 
   const handleStartInterview = async () => {
+    if (!session || !session.user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     const finalRole = isCustomRole ? customRoleInput.trim() : selectedRole;
     if (isCustomRole && !finalRole) {
       setErrorMsg("Please enter a custom role name (e.g., iOS Developer, Security Engineer, DevOps).");
@@ -669,6 +681,12 @@ export default function InterviewSetupPage() {
             : "Powered by real-time LLM reasoning &bull; Voice & typing supported"}
         </span>
       </div>
+
+      {/* Mandatory Sign In Modal Popup */}
+      <SignInModal
+        isOpen={showAuthModal}
+        onClose={() => router.push("/")}
+      />
     </div>
   );
 }
