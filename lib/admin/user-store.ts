@@ -1,3 +1,17 @@
+export interface CandidateSessionRecord {
+  id: string;
+  role: string;
+  difficulty: string;
+  experienceLevel?: string;
+  overallScore?: number;
+  createdAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  questionCount: number;
+  scorecard?: any;
+  resumeFileName?: string;
+}
+
 export interface AppUser {
   id: string;
   name: string;
@@ -7,22 +21,36 @@ export interface AppUser {
   lastLoginAt: string;
   interviewsCompleted?: number;
   lastRole?: string;
+  sessions?: CandidateSessionRecord[];
 }
 
-const USERS_STORAGE_KEY = "interviewai_registered_users";
+const USERS_STORAGE_KEY = "interviewai_registered_users_v2";
 
-// In-memory server store
-let serverUsers: AppUser[] = [
-  {
-    id: "admin_1",
-    name: "Abhishek Kumar Das Pattanayak",
-    email: "abhishekkumardaspattanayak444@gmail.com",
-    firstSeenAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString(),
-    interviewsCompleted: 1,
-    lastRole: "Product Manager",
-  },
-];
+// Server-side persistent user map
+let serverUserMap: Map<string, AppUser> = new Map();
+
+// Initialize Admin
+const defaultAdmin: AppUser = {
+  id: "admin_super",
+  name: "Abhishek Kumar Das Pattanayak",
+  email: "abhishekkumardaspattanayak444@gmail.com",
+  firstSeenAt: "2026-09-01T06:29:00.000Z",
+  lastLoginAt: new Date().toISOString(),
+  interviewsCompleted: 2,
+  lastRole: "Product Manager",
+  sessions: [
+    {
+      id: "session_sample_1",
+      role: "Product Manager",
+      difficulty: "medium",
+      experienceLevel: "3+ years",
+      overallScore: 88,
+      createdAt: "2026-09-01T06:30:00.000Z",
+      questionCount: 5,
+    },
+  ],
+};
+serverUserMap.set(defaultAdmin.email.toLowerCase(), defaultAdmin);
 
 export class UserStore {
   public static upsertUser(user: {
@@ -31,69 +59,82 @@ export class UserStore {
     email?: string | null;
     image?: string | null;
     lastRole?: string;
+    sessions?: CandidateSessionRecord[];
   }): AppUser | null {
     if (!user.email) return null;
 
     const email = user.email.trim().toLowerCase();
-    const existingIndex = serverUsers.findIndex((u) => u.email.toLowerCase() === email);
-
     const now = new Date().toISOString();
-    let updatedUser: AppUser;
+    const existing = serverUserMap.get(email);
 
-    if (existingIndex >= 0) {
-      updatedUser = {
-        ...serverUsers[existingIndex],
-        name: user.name || serverUsers[existingIndex].name,
-        image: user.image || serverUsers[existingIndex].image,
-        lastLoginAt: now,
-        lastRole: user.lastRole || serverUsers[existingIndex].lastRole,
-      };
-      serverUsers[existingIndex] = updatedUser;
-    } else {
-      updatedUser = {
-        id: user.id || `user_${Date.now()}`,
-        name: user.name || "Candidate",
-        email,
-        image: user.image || undefined,
-        firstSeenAt: now,
-        lastLoginAt: now,
-        interviewsCompleted: 0,
-        lastRole: user.lastRole || "Software Engineer",
-      };
-      serverUsers.unshift(updatedUser);
+    let mergedSessions: CandidateSessionRecord[] = existing?.sessions || [];
+    if (user.sessions && user.sessions.length > 0) {
+      const sessionMap = new Map<string, CandidateSessionRecord>();
+      mergedSessions.forEach((s) => sessionMap.set(s.id, s));
+      user.sessions.forEach((s) => sessionMap.set(s.id, s));
+      mergedSessions = Array.from(sessionMap.values()).sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.startedAt || 0).getTime();
+        const timeB = new Date(b.createdAt || b.startedAt || 0).getTime();
+        return timeB - timeA;
+      });
     }
 
-    // Also persist to localStorage on client
+    const updatedUser: AppUser = {
+      id: existing?.id || user.id || `user_${Date.now()}`,
+      name: user.name || existing?.name || "Candidate",
+      email,
+      image: user.image || existing?.image || undefined,
+      firstSeenAt: existing?.firstSeenAt || now,
+      lastLoginAt: now,
+      interviewsCompleted: mergedSessions.length > 0 ? mergedSessions.length : existing?.interviewsCompleted || 0,
+      lastRole: mergedSessions[0]?.role || user.lastRole || existing?.lastRole || "Software Engineer",
+      sessions: mergedSessions,
+    };
+
+    serverUserMap.set(email, updatedUser);
+
+    // Save to client localStorage
     if (typeof window !== "undefined") {
       try {
-        const local = this.getClientUsers();
-        const lIndex = local.findIndex((u) => u.email.toLowerCase() === email);
-        if (lIndex >= 0) {
-          local[lIndex] = updatedUser;
-        } else {
-          local.unshift(updatedUser);
-        }
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(local));
+        const localList = this.getClientUsers();
+        const map = new Map<string, AppUser>();
+        localList.forEach((u) => map.set(u.email.toLowerCase(), u));
+        map.set(email, updatedUser);
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(Array.from(map.values())));
       } catch (err) {
-        console.warn("Error saving users to client localStorage:", err);
+        console.warn("Client localStorage sync error:", err);
       }
     }
 
     return updatedUser;
   }
 
-  public static incrementInterviewCount(email: string): void {
-    const user = serverUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (user) {
-      user.interviewsCompleted = (user.interviewsCompleted || 0) + 1;
+  public static addSessionToUser(email: string, sessionRecord: CandidateSessionRecord): void {
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = serverUserMap.get(cleanEmail);
+    if (!existing) return;
+
+    const sessions = existing.sessions || [];
+    const idx = sessions.findIndex((s) => s.id === sessionRecord.id);
+    if (idx >= 0) {
+      sessions[idx] = sessionRecord;
+    } else {
+      sessions.unshift(sessionRecord);
     }
+
+    existing.sessions = sessions;
+    existing.interviewsCompleted = sessions.length;
+    existing.lastRole = sessionRecord.role;
+    serverUserMap.set(cleanEmail, existing);
 
     if (typeof window !== "undefined") {
       try {
         const local = this.getClientUsers();
-        const lUser = local.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (lUser) {
-          lUser.interviewsCompleted = (lUser.interviewsCompleted || 0) + 1;
+        const user = local.find((u) => u.email.toLowerCase() === cleanEmail);
+        if (user) {
+          user.sessions = sessions;
+          user.interviewsCompleted = sessions.length;
+          user.lastRole = sessionRecord.role;
           localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(local));
         }
       } catch {
@@ -103,26 +144,31 @@ export class UserStore {
   }
 
   public static getServerUsers(): AppUser[] {
-    return serverUsers;
+    return Array.from(serverUserMap.values());
   }
 
   public static getClientUsers(): AppUser[] {
-    if (typeof window === "undefined") return serverUsers;
+    if (typeof window === "undefined") return Array.from(serverUserMap.values());
     try {
       const data = localStorage.getItem(USERS_STORAGE_KEY);
       if (!data) {
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(serverUsers));
-        return serverUsers;
+        const init = Array.from(serverUserMap.values());
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(init));
+        return init;
       }
-      return JSON.parse(data);
+      const parsed: AppUser[] = JSON.parse(data);
+      if (!parsed.some((u) => u.email.toLowerCase() === defaultAdmin.email.toLowerCase())) {
+        parsed.unshift(defaultAdmin);
+      }
+      return parsed;
     } catch {
-      return serverUsers;
+      return Array.from(serverUserMap.values());
     }
   }
 
   public static deleteUser(email: string): void {
     const cleanEmail = email.trim().toLowerCase();
-    serverUsers = serverUsers.filter((u) => u.email.toLowerCase() !== cleanEmail);
+    serverUserMap.delete(cleanEmail);
 
     if (typeof window !== "undefined") {
       try {
@@ -132,5 +178,16 @@ export class UserStore {
         // ignore
       }
     }
+  }
+
+  public static mergeIncomingUsers(incomingList: AppUser[]): AppUser[] {
+    if (Array.isArray(incomingList)) {
+      for (const u of incomingList) {
+        if (u && u.email) {
+          this.upsertUser(u);
+        }
+      }
+    }
+    return this.getServerUsers();
   }
 }

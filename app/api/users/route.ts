@@ -22,6 +22,7 @@ export async function POST(req: Request) {
       email: body.email,
       image: body.image,
       lastRole: body.lastRole,
+      sessions: body.sessions,
     });
 
     return NextResponse.json({
@@ -30,6 +31,23 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to record user login" }, { status: 500 });
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const body = await req.json();
+    if (body.users && Array.isArray(body.users)) {
+      const merged = UserStore.mergeIncomingUsers(body.users);
+      return NextResponse.json({
+        success: true,
+        total: merged.length,
+        users: merged,
+      });
+    }
+    return NextResponse.json({ error: "Invalid users array" }, { status: 400 });
+  } catch (err: any) {
+    return NextResponse.json({ error: "Sync failed" }, { status: 500 });
   }
 }
 
