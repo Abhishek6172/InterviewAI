@@ -26,6 +26,7 @@ import {
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const [interviewHistory, setInterviewHistory] = useState<any[]>([]);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     // Load local practice sessions
@@ -90,6 +91,25 @@ export default function ProfilePage() {
   const activeSession = interviewHistory[0];
   const lastScore = activeSession?.scorecard?.overallScore || 0;
 
+  // Safe date formatter
+  const formattedDate =
+    activeSession?.createdAt && !isNaN(new Date(activeSession.createdAt).getTime())
+      ? new Date(activeSession.createdAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "Today";
+
+  const initials = user.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "CA";
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8 sm:py-12 space-y-8">
       {/* Profile Header Card */}
@@ -98,15 +118,18 @@ export default function ProfilePage() {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
-            {user.image ? (
+            {user.image && !imageError ? (
               <img
                 src={user.image}
-                alt={user.name || "Candidate"}
+                alt=""
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
+                onError={() => setImageError(true)}
                 className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-purple-500/40 shadow-xl"
               />
             ) : (
-              <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-purple-600/30 text-purple-300 font-extrabold text-2xl flex items-center justify-center border-2 border-purple-500/40">
-                {user.name?.slice(0, 2).toUpperCase() || "CA"}
+              <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center border-2 border-purple-500/40 shadow-xl shrink-0">
+                {initials}
               </div>
             )}
 
@@ -202,7 +225,7 @@ export default function ProfilePage() {
                   </Badge>
                 </div>
                 <p className="text-xs text-slate-400">
-                  {activeSession.questions.length} questions &bull; Completed {new Date(activeSession.createdAt).toLocaleDateString()}
+                  {activeSession.questions.length} questions &bull; Completed {formattedDate}
                 </p>
               </div>
 

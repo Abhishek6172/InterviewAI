@@ -21,6 +21,7 @@ interface UserMenuProps {
 export function UserMenu({ onSignInRequired }: UserMenuProps) {
   const { data: session, status } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -97,15 +98,18 @@ export function UserMenu({ onSignInRequired }: UserMenuProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-purple-500/30 hover:border-purple-500/50 transition-all cursor-pointer shadow-sm hover:shadow-purple-500/20"
       >
-        {/* Candidate Profile Picture (PFP) */}
-        {user.image ? (
+        {/* Candidate Profile Picture (PFP) with Google Referrer Fix */}
+        {user.image && !imageError ? (
           <img
             src={user.image}
-            alt={user.name || "User"}
+            alt=""
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
+            onError={() => setImageError(true)}
             className="w-7 h-7 rounded-full object-cover border border-purple-400/60 shadow-sm"
           />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center border border-purple-400/60">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center border border-purple-400/60 shrink-0">
             {initials}
           </div>
         )}
@@ -122,14 +126,17 @@ export function UserMenu({ onSignInRequired }: UserMenuProps) {
           {/* User Details */}
           <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 mb-1">
             <div className="flex items-center gap-2.5">
-              {user.image ? (
+              {user.image && !imageError ? (
                 <img
                   src={user.image}
-                  alt={user.name || "User"}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={() => setImageError(true)}
                   className="w-9 h-9 rounded-full object-cover border border-purple-500/40"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                   {initials}
                 </div>
               )}
