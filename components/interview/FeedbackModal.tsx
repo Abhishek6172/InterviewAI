@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -29,9 +30,23 @@ interface FeedbackModalProps {
 }
 
 export function FeedbackModal({ sessionId, onFeedbackSubmitted }: FeedbackModalProps) {
+  const { data: authSession } = useSession();
+
   // Candidate Info
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+
+  // Auto prefill from Google OAuth session
+  useEffect(() => {
+    if (authSession?.user) {
+      if (authSession.user.name && !name) {
+        setName(authSession.user.name);
+      }
+      if (authSession.user.email && !email) {
+        setEmail(authSession.user.email);
+      }
+    }
+  }, [authSession]);
 
   // Detailed Ratings (1-5)
   const [overallRating, setOverallRating] = useState<number>(5);

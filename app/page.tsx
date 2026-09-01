@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { AIAvatar } from "@/components/avatar/AIAvatar";
 import { AvatarState } from "@/types/avatar";
 import { AnalyticsTracker } from "@/lib/analytics/tracker";
+import { UserMenu } from "@/components/auth/UserMenu";
 import {
   Sparkles,
   ArrowRight,
@@ -58,6 +59,7 @@ export default function LandingPage() {
               <span className="hidden sm:inline">Metrics</span>
             </Button>
           </Link>
+          <UserMenu />
           <Link href="/interview/setup">
             <Button variant="glow" size="sm" className="gap-1 sm:gap-1.5 text-xs px-3 sm:px-4">
               <span>Start</span>

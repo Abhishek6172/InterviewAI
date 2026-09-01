@@ -39,6 +39,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
+import { UserMenu } from "@/components/auth/UserMenu";
 
 const STANDARD_ROLES: { role: string; icon: any; desc: string }[] = [
   {
@@ -263,9 +264,12 @@ export default function InterviewSetupPage() {
             Back to Home
           </Button>
         </Link>
-        <Badge variant="outline" className="text-xs text-purple-400 border-purple-500/30">
-          Fast 60-Second Setup
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="text-xs text-purple-400 border-purple-500/30 hidden sm:inline-flex">
+            Fast 60-Second Setup
+          </Badge>
+          <UserMenu />
+        </div>
       </div>
 
       <div className="text-center space-y-2">
