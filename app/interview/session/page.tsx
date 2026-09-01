@@ -36,7 +36,27 @@ export default function InterviewSessionPage() {
       router.replace("/interview/setup");
       return;
     }
+    if (active.status === "completed") {
+      router.replace("/interview/results");
+      return;
+    }
     setSession(active);
+
+    // Trap history so clicking browser Back button doesn't reload past questions
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = () => {
+      if (confirm("Are you sure you want to leave this active interview? Your progress in this session will end.")) {
+        SessionManager.clearActiveSession();
+        router.replace("/interview/setup");
+      } else {
+        window.history.pushState(null, "", window.location.href);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, [router]);
 
   // Read out current question with AI speech synthesis
@@ -243,7 +263,7 @@ export default function InterviewSessionPage() {
           );
         }
 
-        router.push("/interview/results");
+        router.replace("/interview/results");
       }
     } catch (err) {
       console.error("Evaluation error:", err);
@@ -256,7 +276,7 @@ export default function InterviewSessionPage() {
         setIsEvaluating(false);
         setAvatarState("idle");
       } else {
-        router.push("/interview/results");
+        router.replace("/interview/results");
       }
     }
   };

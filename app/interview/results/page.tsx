@@ -56,6 +56,13 @@ function ResultsContent() {
     setSession(targetSession);
     AnalyticsTracker.track("results_viewed", {}, targetSession.id);
 
+    // Prevent browser Back button from navigating into completed interview
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = () => {
+      router.replace("/profile");
+    };
+    window.addEventListener("popstate", handlePopState);
+
     // Scroll listener to show slide-up feedback prompt
     const handleScroll = () => {
       if (window.scrollY > 300) {
@@ -66,7 +73,10 @@ function ResultsContent() {
     };
 
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, [router, querySessionId]);
 
   const scrollToFeedback = () => {

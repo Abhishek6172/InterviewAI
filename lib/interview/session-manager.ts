@@ -51,6 +51,16 @@ export class SessionManager {
     }
   }
 
+  public static clearActiveSession(): void {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(ACTIVE_SESSION_KEY);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   public static recordAnswer(
     sessionId: string,
     questionId: string,
