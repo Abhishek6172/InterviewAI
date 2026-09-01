@@ -1,7 +1,14 @@
 import { AnalyticsEvent, AnalyticsEventType, ValidationFeedback } from "@/types/analytics";
 
 const ANALYTICS_STORAGE_KEY = "interviewai_analytics_events_v2";
-const FEEDBACK_STORAGE_KEY = "interviewai_user_feedback_v2";
+const PRIMARY_FEEDBACK_KEY = "interviewai_user_feedback_v2";
+const PAST_FEEDBACK_KEYS = [
+  "interviewai_user_feedback_v2",
+  "interviewai_user_feedback_v1",
+  "interviewai_user_feedback",
+  "interviewai_feedback",
+  "interviewai_validation_feedback",
+];
 const DELETED_FEEDBACK_KEY = "interviewai_deleted_feedback_v2";
 
 export class AnalyticsTracker {
@@ -49,7 +56,7 @@ export class AnalyticsTracker {
         const list = Array.from(map.values()).sort(
           (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
         );
-        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(list));
+        localStorage.setItem(PRIMARY_FEEDBACK_KEY, JSON.stringify(list));
       } catch (err) {
         console.warn("Could not save validation feedback locally:", err);
       }
@@ -64,13 +71,16 @@ export class AnalyticsTracker {
         const delSet = new Set(deleted);
 
         const filtered = feedbacks.filter((f) => !delSet.has(f.id));
-        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(filtered));
+        localStorage.setItem(PRIMARY_FEEDBACK_KEY, JSON.stringify(filtered));
       } catch (err) {
         console.warn("Could not save all feedback locally:", err);
       }
     }
   }
 
+  /**
+   * Scans across all historical feedback keys to guarantee no submitted feedback is lost.
+   */
   public static getStoredFeedback(): ValidationFeedback[] {
     if (typeof window === "undefined") return [];
     try {
@@ -78,10 +88,32 @@ export class AnalyticsTracker {
       const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
       const delSet = new Set(deleted);
 
-      const stored = localStorage.getItem(FEEDBACK_STORAGE_KEY);
-      if (!stored) return [];
-      const parsed: ValidationFeedback[] = JSON.parse(stored);
-      return parsed.filter((f) => !delSet.has(f.id));
+      const fbMap = new Map<string, ValidationFeedback>();
+
+      for (const key of PAST_FEEDBACK_KEYS) {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const parsed: ValidationFeedback[] = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              for (const f of parsed) {
+                if (f && f.id && !delSet.has(f.id)) {
+                  fbMap.set(f.id, f);
+                }
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      const merged = Array.from(fbMap.values()).sort(
+        (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+      );
+
+      localStorage.setItem(PRIMARY_FEEDBACK_KEY, JSON.stringify(merged));
+      return merged;
     } catch {
       return [];
     }
@@ -97,8 +129,20 @@ export class AnalyticsTracker {
         localStorage.setItem(DELETED_FEEDBACK_KEY, JSON.stringify(deleted));
       }
 
-      const feedbacks = this.getStoredFeedback().filter((f) => f.id !== feedbackId);
-      localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
+      for (const key of PAST_FEEDBACK_KEYS) {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const parsed: ValidationFeedback[] = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              const filtered = parsed.filter((f) => f.id !== feedbackId);
+              localStorage.setItem(key, JSON.stringify(filtered));
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
     } catch (err) {
       console.warn("Error deleting feedback:", err);
     }
@@ -114,7 +158,9 @@ export class AnalyticsTracker {
         if (!deleted.includes(f.id)) deleted.push(f.id);
       });
       localStorage.setItem(DELETED_FEEDBACK_KEY, JSON.stringify(deleted));
-      localStorage.removeItem(FEEDBACK_STORAGE_KEY);
+      for (const key of PAST_FEEDBACK_KEYS) {
+        localStorage.removeItem(key);
+      }
     } catch {
       // ignore
     }

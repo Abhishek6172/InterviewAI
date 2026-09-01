@@ -24,14 +24,21 @@ export interface AppUser {
   sessions?: CandidateSessionRecord[];
 }
 
-const USERS_STORAGE_KEY = "interviewai_registered_users_v3";
+const PRIMARY_USERS_KEY = "interviewai_registered_users_v3";
+const PAST_USER_KEYS = [
+  "interviewai_registered_users_v3",
+  "interviewai_registered_users_v2",
+  "interviewai_registered_users",
+  "interviewai_users",
+  "interviewai_admin_users",
+];
 const DELETED_USERS_KEY = "interviewai_deleted_users_v3";
 
 // In-memory server cache
 let serverUserMap: Map<string, AppUser> = new Map();
 let deletedUsersSet: Set<string> = new Set();
 
-// Initialize Admin profile
+// Default Super Admin Profile
 const defaultAdmin: AppUser = {
   id: "admin_super",
   name: "Abhishek Kumar Das Pattanayak",
@@ -53,9 +60,7 @@ const defaultAdmin: AppUser = {
   ],
 };
 
-if (!deletedUsersSet.has(defaultAdmin.email.toLowerCase())) {
-  serverUserMap.set(defaultAdmin.email.toLowerCase(), defaultAdmin);
-}
+serverUserMap.set(defaultAdmin.email.toLowerCase(), defaultAdmin);
 
 export class UserStore {
   public static upsertUser(user: {
@@ -102,14 +107,15 @@ export class UserStore {
 
     serverUserMap.set(email, updatedUser);
 
-    // Client localStorage retention
+    // Save to all client storage caches
     if (typeof window !== "undefined") {
       try {
         const localList = this.getClientUsers();
         const map = new Map<string, AppUser>();
         localList.forEach((u) => map.set(u.email.toLowerCase(), u));
         map.set(email, updatedUser);
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(Array.from(map.values())));
+        const finalArr = Array.from(map.values());
+        localStorage.setItem(PRIMARY_USERS_KEY, JSON.stringify(finalArr));
       } catch (err) {
         console.warn("Client localStorage save error:", err);
       }
@@ -144,7 +150,7 @@ export class UserStore {
           user.sessions = sessions;
           user.interviewsCompleted = sessions.length;
           user.lastRole = sessionRecord.role;
-          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(local));
+          localStorage.setItem(PRIMARY_USERS_KEY, JSON.stringify(local));
         }
       } catch {
         // ignore
@@ -156,6 +162,10 @@ export class UserStore {
     return Array.from(serverUserMap.values()).filter((u) => !deletedUsersSet.has(u.email.toLowerCase()));
   }
 
+  /**
+   * Retrieves all users by aggregating across all legacy & current storage keys
+   * guaranteeing no past candidate login is ever lost.
+   */
   public static getClientUsers(): AppUser[] {
     if (typeof window === "undefined") return this.getServerUsers();
     try {
@@ -163,18 +173,62 @@ export class UserStore {
       const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
       const delSet = new Set(deleted.map((e) => e.toLowerCase()));
 
-      const data = localStorage.getItem(USERS_STORAGE_KEY);
-      if (!data) {
-        const init = this.getServerUsers().filter((u) => !delSet.has(u.email.toLowerCase()));
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(init));
-        return init;
+      const userMap = new Map<string, AppUser>();
+
+      // Scan all legacy keys
+      for (const key of PAST_USER_KEYS) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed)) {
+              for (const u of parsed) {
+                if (u && u.email && !delSet.has(u.email.toLowerCase())) {
+                  const email = u.email.toLowerCase();
+                  const existing = userMap.get(email);
+                  if (existing) {
+                    const mergedSessions = [...(existing.sessions || [])];
+                    (u.sessions || []).forEach((s: CandidateSessionRecord) => {
+                      if (!mergedSessions.some((ms) => ms.id === s.id)) {
+                        mergedSessions.push(s);
+                      }
+                    });
+                    userMap.set(email, {
+                      ...existing,
+                      ...u,
+                      sessions: mergedSessions,
+                      interviewsCompleted: Math.max(existing.interviewsCompleted || 0, u.interviewsCompleted || 0, mergedSessions.length),
+                    });
+                  } else {
+                    userMap.set(email, u);
+                  }
+                }
+              }
+            }
+          } catch {
+            // ignore JSON parse errors from corrupt keys
+          }
+        }
       }
-      const parsed: AppUser[] = JSON.parse(data);
-      const filtered = parsed.filter((u) => !delSet.has(u.email.toLowerCase()));
-      if (!filtered.some((u) => u.email.toLowerCase() === defaultAdmin.email.toLowerCase()) && !delSet.has(defaultAdmin.email.toLowerCase())) {
-        filtered.unshift(defaultAdmin);
+
+      // Merge with in-memory server users
+      for (const u of this.getServerUsers()) {
+        if (u && u.email && !delSet.has(u.email.toLowerCase())) {
+          const email = u.email.toLowerCase();
+          if (!userMap.has(email)) {
+            userMap.set(email, u);
+          }
+        }
       }
-      return filtered;
+
+      // Ensure Admin is always present
+      if (!delSet.has(defaultAdmin.email.toLowerCase()) && !userMap.has(defaultAdmin.email.toLowerCase())) {
+        userMap.set(defaultAdmin.email.toLowerCase(), defaultAdmin);
+      }
+
+      const mergedList = Array.from(userMap.values());
+      localStorage.setItem(PRIMARY_USERS_KEY, JSON.stringify(mergedList));
+      return mergedList;
     } catch {
       return this.getServerUsers();
     }
@@ -187,14 +241,25 @@ export class UserStore {
 
     if (typeof window !== "undefined") {
       try {
-        const local = this.getClientUsers().filter((u) => u.email.toLowerCase() !== cleanEmail);
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(local));
-
         const deletedStr = localStorage.getItem(DELETED_USERS_KEY);
         const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
         if (!deleted.includes(cleanEmail)) {
           deleted.push(cleanEmail);
           localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(deleted));
+        }
+
+        // Clean out of all user storage keys
+        for (const key of PAST_USER_KEYS) {
+          const data = localStorage.getItem(key);
+          if (data) {
+            try {
+              const parsed: AppUser[] = JSON.parse(data);
+              const filtered = parsed.filter((u) => u.email?.toLowerCase() !== cleanEmail);
+              localStorage.setItem(key, JSON.stringify(filtered));
+            } catch {
+              // ignore
+            }
+          }
         }
       } catch {
         // ignore
