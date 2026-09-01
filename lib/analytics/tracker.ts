@@ -1,7 +1,8 @@
 import { AnalyticsEvent, AnalyticsEventType, ValidationFeedback } from "@/types/analytics";
 
-const ANALYTICS_STORAGE_KEY = "interviewai_analytics_events";
-const FEEDBACK_STORAGE_KEY = "interviewai_user_feedback";
+const ANALYTICS_STORAGE_KEY = "interviewai_analytics_events_v2";
+const FEEDBACK_STORAGE_KEY = "interviewai_user_feedback_v2";
+const DELETED_FEEDBACK_KEY = "interviewai_deleted_feedback_v2";
 
 export class AnalyticsTracker {
   public static track(
@@ -41,12 +42,31 @@ export class AnalyticsTracker {
   public static saveFeedback(feedback: ValidationFeedback): void {
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem(FEEDBACK_STORAGE_KEY);
-        const feedbacks: ValidationFeedback[] = stored ? JSON.parse(stored) : [];
-        feedbacks.unshift(feedback);
-        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
+        const stored = this.getStoredFeedback();
+        const map = new Map<string, ValidationFeedback>();
+        stored.forEach((f) => map.set(f.id, f));
+        map.set(feedback.id, feedback);
+        const list = Array.from(map.values()).sort(
+          (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+        );
+        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(list));
       } catch (err) {
         console.warn("Could not save validation feedback locally:", err);
+      }
+    }
+  }
+
+  public static saveAllFeedback(feedbacks: ValidationFeedback[]): void {
+    if (typeof window !== "undefined") {
+      try {
+        const deletedStr = localStorage.getItem(DELETED_FEEDBACK_KEY);
+        const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+        const delSet = new Set(deleted);
+
+        const filtered = feedbacks.filter((f) => !delSet.has(f.id));
+        localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(filtered));
+      } catch (err) {
+        console.warn("Could not save all feedback locally:", err);
       }
     }
   }
@@ -54,8 +74,14 @@ export class AnalyticsTracker {
   public static getStoredFeedback(): ValidationFeedback[] {
     if (typeof window === "undefined") return [];
     try {
+      const deletedStr = localStorage.getItem(DELETED_FEEDBACK_KEY);
+      const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+      const delSet = new Set(deleted);
+
       const stored = localStorage.getItem(FEEDBACK_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
+      if (!stored) return [];
+      const parsed: ValidationFeedback[] = JSON.parse(stored);
+      return parsed.filter((f) => !delSet.has(f.id));
     } catch {
       return [];
     }
@@ -64,6 +90,13 @@ export class AnalyticsTracker {
   public static deleteFeedback(feedbackId: string): void {
     if (typeof window === "undefined") return;
     try {
+      const deletedStr = localStorage.getItem(DELETED_FEEDBACK_KEY);
+      const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+      if (!deleted.includes(feedbackId)) {
+        deleted.push(feedbackId);
+        localStorage.setItem(DELETED_FEEDBACK_KEY, JSON.stringify(deleted));
+      }
+
       const feedbacks = this.getStoredFeedback().filter((f) => f.id !== feedbackId);
       localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(feedbacks));
     } catch (err) {
@@ -74,6 +107,13 @@ export class AnalyticsTracker {
   public static clearAllFeedback(): void {
     if (typeof window === "undefined") return;
     try {
+      const current = this.getStoredFeedback();
+      const deletedStr = localStorage.getItem(DELETED_FEEDBACK_KEY);
+      const deleted: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+      current.forEach((f) => {
+        if (!deleted.includes(f.id)) deleted.push(f.id);
+      });
+      localStorage.setItem(DELETED_FEEDBACK_KEY, JSON.stringify(deleted));
       localStorage.removeItem(FEEDBACK_STORAGE_KEY);
     } catch {
       // ignore

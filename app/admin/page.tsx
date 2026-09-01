@@ -104,17 +104,42 @@ export default function AdminPortalPage() {
       setUsers(clientUsers);
     }
 
-    // 2. Load feedback
+    // 2. Load feedback with bidirectional merging and persistent retention
+    const clientFeedbacks = AnalyticsTracker.getStoredFeedback();
+    let finalFeedbacks: ValidationFeedback[] = clientFeedbacks;
+
     try {
       const fRes = await fetch("/api/feedback");
       const fData = await fRes.json();
-      if (fData?.feedbacks) {
-        setFeedbacks(fData.feedbacks);
+      if (fData?.feedbacks && Array.isArray(fData.feedbacks)) {
+        const fbMap = new Map<string, ValidationFeedback>();
+        // Add client feedbacks first
+        clientFeedbacks.forEach((f) => fbMap.set(f.id, f));
+        // Merge server feedbacks
+        fData.feedbacks.forEach((f: ValidationFeedback) => {
+          if (f && f.id) {
+            fbMap.set(f.id, f);
+          }
+        });
+
+        finalFeedbacks = Array.from(fbMap.values()).sort((a, b) => {
+          return new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime();
+        });
+
+        setFeedbacks(finalFeedbacks);
+        AnalyticsTracker.saveAllFeedback(finalFeedbacks);
+
+        // Sync merged list back to server so server store is always complete
+        fetch("/api/feedback", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ feedbacks: finalFeedbacks }),
+        }).catch(() => {});
       } else {
-        setFeedbacks(AnalyticsTracker.getStoredFeedback());
+        setFeedbacks(clientFeedbacks);
       }
     } catch {
-      setFeedbacks(AnalyticsTracker.getStoredFeedback());
+      setFeedbacks(clientFeedbacks);
     }
 
     // 3. Funnel stats
