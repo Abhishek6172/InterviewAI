@@ -1,63 +1,59 @@
 import { GenerateQuestionsRequest, EvaluateAnswerRequest, GenerateScorecardRequest } from "./types";
 
 export const INTERVIEWER_SYSTEM_PROMPT = `
-You are an expert, professional, and empathetic Senior Interviewer conducting a realistic job interview.
-You speak directly, stay focused on the candidate's target role, adapt to their seniority and resume background, and probe for real engineering/domain depth.
+You are Sara, an expert, professional, and discerning Senior AI Technical Interviewer at a top technology firm.
+Your goal is to conduct a highly realistic, customized, and non-repetitive job interview tailored specifically to the candidate's target role, experience level, and resume background.
 
-Core Operating Principles:
-1. Always remain in character as an interviewer.
-2. If a resume is provided, you MUST directly inspect their listed projects, technologies, and work history, and tailor questions to their actual projects.
-3. NEVER answer the question for the candidate or give away the solution while interviewing.
-4. Evaluate what the candidate ACTUALLY stated:
-   - If the candidate answers "I don't know", "no idea", or gives an empty/irrelevant response, score 0.0-2.5/10 and provide direct feedback on how they should have approached the unknown question.
-   - If the candidate demonstrates depth, trade-offs, and metrics, score 8.0-10.0/10.
-5. If the candidate mentions a specific project or architecture, ask a natural, probing follow-up.
-6. Return strictly valid JSON matching the specified schemas.
+Core Operating Rules:
+1. ALWAYS stay in character as Sara, the interviewer. Keep questions natural, crisp, conversational, and direct.
+2. IF A RESUME IS PROVIDED:
+   - You MUST thoroughly scan their listed projects, work experience, technologies, and achievements.
+   - You MUST explicitly name their actual projects (e.g. "I noticed your project [Project Name]...") and probe their specific architecture, trade-offs, and tech stack.
+   - Never ask generic questions when resume projects and technologies are available.
+3. PREVENT REPETITION:
+   - Each question MUST cover a completely different angle:
+     * Question 1: Introduction & Architecture Deep-Dive into their primary listed project / work.
+     * Question 2: Technical deep-dive into specific tools, state management, databases, or API design used in their project.
+     * Question 3: Critical debugging, edge-cases, concurrency, or performance bottleneck they solved.
+     * Question 4: Behavioral STAR question regarding technical conflict, tight deadlines, or ambiguity during that project.
+     * Question 5+: System scalability, security, testing strategy, or failure recovery for their systems.
+4. Return strictly valid JSON conforming to the requested schema with no surrounding text or markdown preamble.
 `;
 
 export function createQuestionsPrompt(req: GenerateQuestionsRequest): string {
-  const historySnippet =
-    req.conversationHistory && req.conversationHistory.length > 0
-      ? `Previous Conversation Context:\n${req.conversationHistory.map((h) => `Q: ${h.questionText}\nA: ${h.userAnswer}`).join("\n")}`
-      : "No previous questions.";
-
-  const hasResume = req.resumeText && req.resumeText.trim().length > 0;
+  const hasResume = req.resumeText && req.resumeText.trim().length > 20;
 
   const resumeSection = hasResume
-    ? `CANDIDATE'S RESUME & PROJECTS (MANDATORY TO USE):\n"""\n${req.resumeText!.slice(0, 3500)}\n"""\n\nCRITICAL INSTRUCTION: You MUST ask questions directly referencing the candidate's actual projects, technologies, internships, or achievements extracted from the resume above.
-- Question 1 MUST explicitly name and ask about their main project/experience from the resume (e.g. "I see on your resume that you worked on [Project Name] using [Tech Stack]...").
-- Question 2 MUST ask a deep technical challenge or design decision related to their listed projects or technologies.`
-    : "No resume provided. Generate standard role questions.";
+    ? `=== CANDIDATE RESUME & PROJECT PORTFOLIO (CRITICAL - YOU MUST USE THIS) ===\n${req.resumeText!.slice(0, 4500)}\n========================================================================\n
+INSTRUCTIONS FOR RESUME-BASED QUESTIONS:
+- Extract 2-3 specific project names, tools, languages, and frameworks from the resume above.
+- Question 1 MUST explicitly cite their main project by name and ask them to walk through the system architecture and their specific contributions.
+- Question 2 MUST ask a deep technical question about a specific technology, library, or database mentioned in their projects.
+- Question 3 MUST probe a real-world edge case, latency optimization, or debugging incident related to their tech stack.
+- Question 4 MUST be a behavioral question (STAR method) about collaboration or shifting priorities during their project work.`
+    : `No resume provided. Generate a diverse, non-repeating set of ${req.count} questions tailored for a ${req.difficulty} level ${req.role} candidate covering introductory architecture, technical depth, problem-solving, behavioral teamwork, and system reliability.`;
 
   return `
-Create a realistic interview plan with ${req.count} questions for a "${req.role}" interview.
-- Candidate Experience Level: ${req.experienceLevel}
-- Difficulty: ${req.difficulty}
-- Interview Style: ${req.interviewType}
+Conduct a "${req.role}" interview (${req.difficulty} difficulty, ${req.experienceLevel} level, style: ${req.interviewType}) with ${req.count} questions.
 
 ${resumeSection}
 
-${historySnippet}
-
-Guidelines:
-1. Ensure questions logically progress:
-   - Question 1: ${hasResume ? "Direct question referencing their specific resume project and asking them to walk through the technical architecture." : `Foundational ${req.role} introductory question.`}
-   - Question 2: ${hasResume ? "Deep-dive technical probing on the specific tools, libraries, or bottlenecks from their resume project." : "Core technical depth scenario or algorithms."}
-   - Middle/Final questions: Practical challenges, behavioral situation (STAR method), and system/product trade-offs for ${req.role}.
-2. Output strictly valid JSON matching this schema:
+JSON Output Schema:
 {
   "questions": [
     {
       "id": "q1",
       "order": 1,
-      "question": "Realistic interview question explicitly citing resume projects if provided.",
+      "question": "Clear, realistic interview question (explicitly naming candidate's project if resume was provided).",
       "category": "introductory" | "technical" | "behavioral" | "problem-solving" | "system-design",
       "difficulty": "${req.difficulty}",
-      "contextHint": "1-sentence hint of what an interviewer looks for",
-      "expectedTopics": ["topic1", "topic2"]
+      "contextHint": "1-sentence hint for the candidate",
+      "expectedTopics": ["Key Topic 1", "Key Topic 2"]
     }
   ]
 }
+
+Ensure questions are 100% unique, non-repetitive, and directly relevant to ${req.role}.
 Return ONLY valid JSON.
 `;
 }
@@ -65,11 +61,11 @@ Return ONLY valid JSON.
 export function createEvaluationPrompt(req: EvaluateAnswerRequest): string {
   const historySnippet =
     req.conversationHistory && req.conversationHistory.length > 0
-      ? `Prior Context:\n${req.conversationHistory.slice(-2).map((h) => `Q: ${h.questionText}\nA: ${h.userAnswer}`).join("\n")}\n`
+      ? `Prior Questions in Session:\n${req.conversationHistory.slice(-2).map((h) => `Q: ${h.questionText}\nA: ${h.userAnswer}`).join("\n")}\n`
       : "";
 
   const isUnknownAnswer =
-    /^(i don'?t know|no idea|i am not sure|idk|pass|don'?t know|nothing|na|none)\.?$/i.test(req.userAnswer.trim());
+    /^(i don'?t know|no idea|i am not sure|idk|pass|don'?t know|nothing|na|none|skip)\.?$/i.test(req.userAnswer.trim());
 
   return `
 You are evaluating a candidate's answer in a "${req.role}" (${req.difficulty} difficulty, ${req.experienceLevel} level) interview.
@@ -82,11 +78,11 @@ Candidate's Actual Answer:
 "${req.userAnswer}"
 
 Evaluation Rules:
-1. Rate their ACTUAL response objectively across 5 dimensions on a 1.0-10.0 scale:
+1. Rate their response objectively on a 1.0-10.0 scale:
    ${
      isUnknownAnswer
-       ? "NOTE: The candidate answered they do not know the answer. Score them appropriately low (1.0 - 2.5 / 10) across technical and clarity metrics, and give advice on how candidates should handle unknown topics during interviews (e.g. asking clarifying questions or mentioning related concepts)."
-       : "Evaluate based on technical accuracy, STAR structure, clarity, and trade-off awareness."
+       ? "NOTE: The candidate answered 'I don't know' or skipped. Score them 1.0-2.5/10 across technical and clarity metrics and provide advice on how candidates should reason aloud through unknown topics during technical interviews."
+       : "Evaluate based on technical correctness, depth, STAR structure, trade-offs, and clarity."
    }
    - Communication (Articulation, pacing, structure)
    - Technical Accuracy (Domain correctness, depth, trade-off understanding)
@@ -132,7 +128,7 @@ What could improve: ${(req.evaluations[q.id]?.whatCouldImprove || []).join("; ")
     )
     .join("\n");
 
-  const resumeContext = req.resumeText ? `Candidate Resume Context:\n${req.resumeText.slice(0, 1500)}\n` : "";
+  const resumeContext = req.resumeText ? `Candidate Resume Context:\n${req.resumeText.slice(0, 2000)}\n` : "";
 
   return `
 Generate a comprehensive, evidence-based final interview scorecard for a candidate who completed a "${req.role}" (${req.difficulty} difficulty, ${req.experienceLevel} level) interview.
@@ -142,7 +138,7 @@ Interview Transcript & Evaluations:
 ${conversationSummary}
 
 Guidelines:
-1. Calculate overall score (1-100) and dimensional averages (1-10) objectively from their actual answers. If candidate answered "I don't know" to most questions, the overall score should accurately reflect that (e.g. 15-35 / 100).
+1. Calculate overall score (1-100) and dimensional averages (1-10) objectively from their actual answers. If candidate answered "I don't know" or skipped most questions, the score should accurately reflect that (e.g. 15-35 / 100).
 2. Executive Summary: 3-4 professional sentences summarizing overall interview readiness, citing specific aspects of their answers.
 3. Strengths: 3 to 5 concise points citing actual examples from the session.
 4. Areas to Improve: 3 to 5 actionable points directly addressing weaknesses noticed in their answers.

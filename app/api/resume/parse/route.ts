@@ -10,20 +10,47 @@ function parsePDF(buffer: Buffer): Promise<string> {
 
       pdfParser.on("pdfParser_dataError", (errData: any) => {
         console.warn("PDFParser data error:", errData);
-        // Fall back to stream extraction instead of throwing
-        const rawFallback = fallbackExtractTextFromPDF(buffer);
-        resolve(rawFallback);
+        resolve(fallbackExtractTextFromPDF(buffer));
       });
 
-      pdfParser.on("pdfParser_dataReady", () => {
+      pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
         try {
-          const rawText = pdfParser.getRawTextContent();
-          if (rawText && rawText.trim().length > 20) {
-            resolve(rawText);
-          } else {
-            resolve(fallbackExtractTextFromPDF(buffer));
+          let parsedText = "";
+
+          // Extract and decode URL-encoded text from PDF pages
+          if (pdfData && Array.isArray(pdfData.Pages)) {
+            for (const page of pdfData.Pages) {
+              if (Array.isArray(page.Texts)) {
+                for (const textItem of page.Texts) {
+                  if (Array.isArray(textItem.R)) {
+                    for (const r of textItem.R) {
+                      if (r.T) {
+                        try {
+                          parsedText += decodeURIComponent(r.T) + " ";
+                        } catch {
+                          parsedText += r.T + " ";
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              parsedText += "\n";
+            }
           }
-        } catch {
+
+          if (parsedText.trim().length > 30) {
+            resolve(parsedText);
+          } else {
+            const raw = pdfParser.getRawTextContent();
+            if (raw && raw.trim().length > 30) {
+              resolve(raw);
+            } else {
+              resolve(fallbackExtractTextFromPDF(buffer));
+            }
+          }
+        } catch (e) {
+          console.warn("Error decoding PDF text:", e);
           resolve(fallbackExtractTextFromPDF(buffer));
         }
       });
@@ -39,16 +66,14 @@ function parsePDF(buffer: Buffer): Promise<string> {
 function fallbackExtractTextFromPDF(buffer: Buffer): string {
   try {
     const raw = buffer.toString("binary");
-    // Extract text blocks inside PDF text objects
     const matches = raw.match(/\((?:\\\(|\\\)|[^()])*\)|\[(?:[^\]])*\]/g);
     if (matches && matches.length > 0) {
       return matches
         .map((m) => m.replace(/[\(\)\[\]\\]/g, " "))
-        .filter((t) => /[a-zA-Z0-9]/.test(t) && t.length > 3)
+        .filter((t) => /[a-zA-Z0-9]/.test(t) && t.length > 2)
         .join(" ")
         .slice(0, 4000);
     }
-    // Clean ASCII stream
     return buffer
       .toString("utf-8")
       .replace(/[^\x20-\x7E\n\r]/g, " ")
@@ -81,21 +106,22 @@ export async function POST(req: NextRequest) {
       const result = await mammoth.extractRawText({ buffer });
       extractedText = result.value || "";
     } else {
-      // Plain text, Markdown, RTF, JSON
       extractedText = buffer.toString("utf-8");
     }
 
-    // Clean up excessive whitespace while preserving structure
+    // Clean up formatting
     const cleanedText = extractedText
       .replace(/\r\n/g, "\n")
+      .replace(/\t/g, " ")
+      .replace(/ +/g, " ")
       .replace(/\n{3,}/g, "\n\n")
-      .replace(/---+/g, "")
       .trim();
 
     if (!cleanedText || cleanedText.length < 10) {
-      return NextResponse.json({
-        error: "Could not detect readable text in this document. Please copy and paste your resume text.",
-      }, { status: 422 });
+      return NextResponse.json(
+        { error: "Could not detect readable text in this document. Please paste your resume text manually." },
+        { status: 422 }
+      );
     }
 
     return NextResponse.json({

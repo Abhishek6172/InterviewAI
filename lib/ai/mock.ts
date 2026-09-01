@@ -9,135 +9,342 @@ import {
 } from "./types";
 import { InterviewQuestion } from "@/types/interview";
 
+// Common tech keywords to extract from resumes
+const TECH_KEYWORDS = [
+  "React", "Next.js", "TypeScript", "JavaScript", "Vue", "Angular", "Node.js", "Express",
+  "Python", "Django", "FastAPI", "Flask", "Java", "Spring Boot", "Go", "Golang", "Rust",
+  "PostgreSQL", "MongoDB", "MySQL", "Redis", "Elasticsearch", "Cassandra",
+  "Docker", "Kubernetes", "AWS", "GCP", "Azure", "CI/CD", "GitHub Actions", "Terraform",
+  "GraphQL", "REST APIs", "gRPC", "WebSockets", "Tailwind CSS", "Redux", "Zustand",
+  "PyTorch", "TensorFlow", "Pandas", "Scikit-Learn", "OpenAI API", "LangChain"
+];
+
+function extractResumeProjectsAndTech(resumeText: string): { projects: string[]; techStack: string[] } {
+  if (!resumeText || resumeText.trim().length < 15) {
+    return { projects: [], techStack: [] };
+  }
+
+  const text = resumeText;
+  const detectedTech: string[] = [];
+
+  for (const tech of TECH_KEYWORDS) {
+    const regex = new RegExp(`\\b${tech.replace(".", "\\.")}\\b`, "i");
+    if (regex.test(text)) {
+      detectedTech.push(tech);
+    }
+  }
+
+  // Extract project names by scanning for lines with "Project:", headers, or bulleted titles
+  const projects: string[] = [];
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.length > 3 && l.length < 80);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const projectMatch = line.match(/(?:project|application|platform|system|portal|app)\s*:\s*([A-Za-z0-9\s-_]+)/i);
+    if (projectMatch && projectMatch[1]?.trim()) {
+      projects.push(projectMatch[1].trim());
+    } else if (/^(?:•|-|\*)\s*([A-Za-z0-9\s-_]{3,40})(?:\s*\||\s*\(|\s*–|\s*-)/i.test(line)) {
+      const match = line.match(/^(?:•|-|\*)\s*([A-Za-z0-9\s-_]{3,40})/);
+      if (match && match[1]) {
+        projects.push(match[1].trim());
+      }
+    } else if (/(?:built|developed|created|architected|designed)\s+(?:a|an)\s+([A-Za-z0-9\s-_]{4,40})/i.test(line)) {
+      const match = line.match(/(?:built|developed|created|architected|designed)\s+(?:a|an)\s+([A-Za-z0-9\s-_]{4,40})/i);
+      if (match && match[1]) {
+        projects.push(match[1].trim());
+      }
+    }
+  }
+
+  return {
+    projects: Array.from(new Set(projects)).slice(0, 4),
+    techStack: Array.from(new Set(detectedTech)).slice(0, 8),
+  };
+}
+
 export class MockAIService implements AIService {
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
-    const role = req.role.toLowerCase();
-    const hasResume = Boolean(req.resumeText && req.resumeText.trim().length > 0);
+    const role = req.role;
+    const { projects, techStack } = extractResumeProjectsAndTech(req.resumeText || "");
+    const hasResume = projects.length > 0 || techStack.length > 0;
 
-    let questionBank: InterviewQuestion[] = [];
+    const primaryProject = projects[0] || "your primary highlighted project";
+    const secondaryProject = projects[1] || projects[0] || "your secondary technical application";
+    const primaryTech = techStack[0] || "your chosen modern framework";
+    const secondaryTech = techStack[1] || techStack[0] || "your backend or database layer";
+    const thirdTech = techStack[2] || "caching and state layer";
+
+    const questions: InterviewQuestion[] = [];
 
     if (hasResume) {
-      // Resume-aware questions
-      questionBank = [
-        {
-          id: `q_res_${Date.now()}_1`,
-          order: 1,
-          question: `I reviewed your resume for ${req.role}. Can you introduce yourself and walk me through the architecture and your key technical contributions to your primary project listed on your resume?`,
-          category: "introductory",
-          difficulty: req.difficulty,
-          contextHint: "Detail your specific role, technical stack, architecture decisions, and business impact.",
-          expectedTopics: ["Project Architecture", "Technical Stack", "Ownership", "Key Metrics"],
-        },
-        {
-          id: `q_res_${Date.now()}_2`,
-          order: 2,
-          question: `Looking at your project experience, what was the most difficult technical challenge or performance bottleneck you encountered, and how did you debug and resolve it?`,
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Explain your diagnosis methodology, alternative solutions evaluated, and the final implementation.",
-          expectedTopics: ["Root Cause Analysis", "Debugging", "Optimization", "Trade-offs"],
-        },
-        {
-          id: `q_res_${Date.now()}_3`,
-          order: 3,
-          question: `Tell me about a time you had to adapt to changing project requirements or handle a technical disagreement with a team member while building these systems.`,
-          category: "behavioral",
-          difficulty: req.difficulty,
-          contextHint: "Use the STAR method: Situation, Task, Action, Result.",
-          expectedTopics: ["Collaboration", "Conflict Resolution", "STAR method"],
-        },
-        {
-          id: `q_res_${Date.now()}_4`,
-          order: 4,
-          question: `How did you approach automated testing, continuous integration, and edge-case validation for your applications before shipping them?`,
-          category: "problem-solving",
-          difficulty: req.difficulty,
-          contextHint: "Discuss unit vs integration tests, mocking, CI pipelines, and error handling.",
-          expectedTopics: ["Testing Strategy", "CI/CD", "Reliability"],
-        },
-        {
-          id: `q_res_${Date.now()}_5`,
-          order: 5,
-          question: `If traffic to your application increased by 10x overnight, what parts of your architecture would fail first and how would you scale them?`,
-          category: "system-design",
-          difficulty: req.difficulty,
-          contextHint: "Identify bottlenecks: database connections, caching, load balancing, or asynchronous processing.",
-          expectedTopics: ["Scaling", "Caching", "Database Bottlenecks", "Asynchronous Workers"],
-        },
-      ];
-    } else if (role.includes("frontend") || role.includes("ui") || role.includes("react")) {
-      questionBank = [
-        {
-          id: `q_fe_${Date.now()}_1`,
-          order: 1,
-          question: "Can you walk me through a challenging frontend feature you built, focusing on how you managed state and optimized rendering performance?",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Highlight state libraries, reconciliation, memoization, and bundle size.",
-          expectedTopics: ["State Management", "Virtual DOM", "React.memo/useMemo", "Core Web Vitals"],
-        },
-        {
-          id: `q_fe_${Date.now()}_2`,
-          order: 2,
-          question: "How do you handle API error boundaries, loading skeletons, and offline fallback states to ensure a seamless user experience?",
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Discuss optimistic updates, error boundaries, React Suspense, and network retry logic.",
-          expectedTopics: ["Error Boundaries", "Optimistic UI", "Async handling"],
-        },
-        {
-          id: `q_fe_${Date.now()}_3`,
-          order: 3,
-          question: "Describe a time when you received ambiguous design mockups or shifting requirements close to a deadline. How did you handle it?",
-          category: "behavioral",
-          difficulty: req.difficulty,
-          contextHint: "Use the STAR method: Situation, Task, Action, Result with focus on proactive alignment.",
-          expectedTopics: ["Communication", "Stakeholder management", "STAR method"],
-        },
-      ];
+      // 1. Project 1 Architecture Deep Dive
+      questions.push({
+        id: `q_res_${Date.now()}_1`,
+        order: 1,
+        question: `I reviewed your resume for ${role}. In particular, I noticed your work on "${primaryProject}". Could you introduce yourself and walk me through the end-to-end architecture, your specific ownership, and why you chose ${primaryTech}?`,
+        category: "introductory",
+        difficulty: req.difficulty,
+        contextHint: "Explain the system flow, component boundaries, your exact contributions, and key architectural choices.",
+        expectedTopics: [primaryProject, primaryTech, "System Architecture", "Individual Ownership"],
+      });
+
+      // 2. Tech Stack & State / Database Probing
+      questions.push({
+        id: `q_res_${Date.now()}_2`,
+        order: 2,
+        question: `In "${primaryProject}", how did you handle data persistence and API communication between ${primaryTech} and ${secondaryTech}? What trade-offs did you encounter regarding latency or state synchronization?`,
+        category: "technical",
+        difficulty: req.difficulty,
+        contextHint: "Highlight API contracts, serialization, caching, data consistency, and performance considerations.",
+        expectedTopics: [primaryTech, secondaryTech, "Data Consistency", "API Design", "Trade-offs"],
+      });
+
+      // 3. Difficult Debugging & Performance Bottlenecks
+      questions.push({
+        id: `q_res_${Date.now()}_3`,
+        order: 3,
+        question: `What was the most challenging technical bug, race condition, or performance bottleneck you encountered while developing "${secondaryProject}" or using ${thirdTech}? How did you profile and resolve it?`,
+        category: "problem-solving",
+        difficulty: req.difficulty,
+        contextHint: "Walk through your diagnosis methodology: reproduction, telemetry/logs, root cause, and the fix.",
+        expectedTopics: ["Root Cause Analysis", "Debugging", "Profiling", "Fix & Verification"],
+      });
+
+      // 4. Behavioral & Engineering Collaboration (STAR)
+      questions.push({
+        id: `q_res_${Date.now()}_4`,
+        order: 4,
+        question: `Tell me about a time during one of these projects when requirements changed right before a release, or you had a technical disagreement on the team regarding tool selection or code design. How did you resolve it?`,
+        category: "behavioral",
+        difficulty: req.difficulty,
+        contextHint: "Use the STAR method: Situation, Task, Action, Result with focus on team communication.",
+        expectedTopics: ["Collaboration", "Conflict Resolution", "STAR Method", "Engineering Judgment"],
+      });
+
+      // 5. System Design & Scalability
+      questions.push({
+        id: `q_res_${Date.now()}_5`,
+        order: 5,
+        question: `If "${primaryProject}" experienced a sudden 50x surge in concurrent active users, what components of your architecture (e.g. database connections, memory, network bandwidth) would fail first, and how would you redesign it?`,
+        category: "system-design",
+        difficulty: req.difficulty,
+        contextHint: "Discuss horizontal scaling, Redis caching, read replicas, asynchronous queues, and load balancing.",
+        expectedTopics: ["Horizontal Scaling", "Caching", "Queues", "Bottleneck Mitigation"],
+      });
     } else {
-      // General Software Engineer
-      questionBank = [
-        {
-          id: `q_gen_${Date.now()}_1`,
-          order: 1,
-          question: `Can you introduce your background in ${req.role} and explain the technical architecture of a recent project you built?`,
-          category: "introductory",
-          difficulty: req.difficulty,
-          contextHint: "Give a crisp overview covering technical stack, your specific ownership, and key results.",
-          expectedTopics: ["Project Overview", "Ownership", "Technical Stack"],
-        },
-        {
-          id: `q_gen_${Date.now()}_2`,
-          order: 2,
-          question: `What are the most important design trade-offs you consider when architecting systems for ${req.role}?`,
-          category: "technical",
-          difficulty: req.difficulty,
-          contextHint: "Discuss performance, maintainability, scalability, and testability.",
-          expectedTopics: ["Design Trade-offs", "Scalability", "Maintainability"],
-        },
-        {
-          id: `q_gen_${Date.now()}_3`,
-          order: 3,
-          question: "Tell me about a critical bug or production incident you investigated. What was the root cause and how did you resolve it?",
-          category: "behavioral",
-          difficulty: req.difficulty,
-          contextHint: "Use the STAR method: Situation, Task, Action, Result with post-mortem learnings.",
-          expectedTopics: ["Debugging", "Incident Management", "STAR method"],
-        },
-      ];
+      // Role-specific non-repeating diverse questions
+      const isFrontend = /frontend|react|ui|web|javascript|next/i.test(role);
+      const isBackend = /backend|api|server|node|python|java|golang|sql/i.test(role);
+      const isData = /data|analytics|machine learning|ai|ml/i.test(role);
+
+      if (isFrontend) {
+        questions.push(
+          {
+            id: `q_fe_${Date.now()}_1`,
+            order: 1,
+            question: `Welcome to your ${role} interview. Could you introduce yourself and describe a complex frontend application you built, focusing on how you structured component hierarchies and managed global state?`,
+            category: "introductory",
+            difficulty: req.difficulty,
+            contextHint: "Explain component modularity, state architecture, and render optimization.",
+            expectedTopics: ["Component Design", "State Management", "Performance"],
+          },
+          {
+            id: `q_fe_${Date.now()}_2`,
+            order: 2,
+            question: `How do you identify, measure, and optimize Web Vitals (such as Largest Contentful Paint, INP, and cumulative layout shift) in production web applications?`,
+            category: "technical",
+            difficulty: req.difficulty,
+            contextHint: "Discuss code splitting, lazy loading, image optimization, memoization, and network watermarking.",
+            expectedTopics: ["Core Web Vitals", "LCP", "Code Splitting", "Bundle Optimization"],
+          },
+          {
+            id: `q_fe_${Date.now()}_3`,
+            order: 3,
+            question: `How do you architect resilient error boundaries, optimistic UI updates, and offline caching when handling unreliable third-party APIs?`,
+            category: "problem-solving",
+            difficulty: req.difficulty,
+            contextHint: "Mention Error Boundaries, React Query/SWR, localStorage, and retry backoff.",
+            expectedTopics: ["Error Boundaries", "Optimistic Updates", "Offline Fallbacks"],
+          },
+          {
+            id: `q_fe_${Date.now()}_4`,
+            order: 4,
+            question: `Tell me about a time you had to make a tough trade-off between delivering a feature quickly versus refactoring technical debt or maintaining strict accessibility standards.`,
+            category: "behavioral",
+            difficulty: req.difficulty,
+            contextHint: "Use the STAR method: Situation, Task, Action, Result.",
+            expectedTopics: ["Technical Debt", "Prioritization", "STAR Framework"],
+          },
+          {
+            id: `q_fe_${Date.now()}_5`,
+            order: 5,
+            question: `How would you design a high-performance, real-time collaborative workspace (like Google Docs or Figma canvas) in the browser?`,
+            category: "system-design",
+            difficulty: req.difficulty,
+            contextHint: "Discuss WebSockets, CRDTs / Operational Transformation, Canvas rendering, and conflict resolution.",
+            expectedTopics: ["WebSockets", "CRDTs", "Virtualization", "Conflict Resolution"],
+          }
+        );
+      } else if (isBackend) {
+        questions.push(
+          {
+            id: `q_be_${Date.now()}_1`,
+            order: 1,
+            question: `Welcome. Can you introduce yourself and walk me through a distributed service or backend system you architected, explaining how data flows from API gateway to storage?`,
+            category: "introductory",
+            difficulty: req.difficulty,
+            contextHint: "Cover gateway routing, authentication, business logic layer, and database design.",
+            expectedTopics: ["Service Architecture", "API Gateway", "Database Design"],
+          },
+          {
+            id: `q_be_${Date.now()}_2`,
+            order: 2,
+            question: `How do you decide between SQL relational databases (PostgreSQL/MySQL) and NoSQL stores (MongoDB/DynamoDB) when designing high-throughput transaction systems?`,
+            category: "technical",
+            difficulty: req.difficulty,
+            contextHint: "Discuss ACID guarantees, schema evolution, sharding, and write/read patterns.",
+            expectedTopics: ["ACID Properties", "Schema Trade-offs", "Sharding", "Indexes"],
+          },
+          {
+            id: `q_be_${Date.now()}_3`,
+            order: 3,
+            question: `Describe a production outage or critical concurrency issue (like a race condition or database deadlock) you investigated. What was the root cause and resolution?`,
+            category: "problem-solving",
+            difficulty: req.difficulty,
+            contextHint: "Detail log analysis, lock contention, isolation levels, and post-mortem safeguards.",
+            expectedTopics: ["Concurrency", "Deadlocks", "Root Cause Analysis", "Isolation Levels"],
+          },
+          {
+            id: `q_be_${Date.now()}_4`,
+            order: 4,
+            question: `Tell me about a time you had to push back on unrealistic technical requirements or advocate for code quality and test coverage against tight deadlines.`,
+            category: "behavioral",
+            difficulty: req.difficulty,
+            contextHint: "Use the STAR method: Situation, Task, Action, Result.",
+            expectedTopics: ["Stakeholder Management", "Engineering Standards", "STAR Method"],
+          },
+          {
+            id: `q_be_${Date.now()}_5`,
+            order: 5,
+            question: `Design a rate-limiting service capable of handling 500,000 requests per second across a global server cluster.`,
+            category: "system-design",
+            difficulty: req.difficulty,
+            contextHint: "Discuss Token Bucket / Leaky Bucket algorithms, Redis cluster sliding windows, and local cache fallbacks.",
+            expectedTopics: ["Rate Limiting", "Token Bucket", "Redis Sliding Window", "High Availability"],
+          }
+        );
+      } else if (isData) {
+        questions.push(
+          {
+            id: `q_data_${Date.now()}_1`,
+            order: 1,
+            question: `Can you introduce yourself and discuss an end-to-end data pipeline or analytical model you designed and deployed to production?`,
+            category: "introductory",
+            difficulty: req.difficulty,
+            contextHint: "Discuss data ingestion, schema normalization, modeling, and business outcomes.",
+            expectedTopics: ["ETL Pipelines", "Data Modeling", "Business Metrics"],
+          },
+          {
+            id: `q_data_${Date.now()}_2`,
+            order: 2,
+            question: `How do you handle dirty data, missing values, and schema drift in real-time streaming pipelines?`,
+            category: "technical",
+            difficulty: req.difficulty,
+            contextHint: "Mention dead-letter queues, schema registries, validation layers, and imputation.",
+            expectedTopics: ["Data Quality", "Schema Registry", "Dead-Letter Queues"],
+          },
+          {
+            id: `q_data_${Date.now()}_3`,
+            order: 3,
+            question: `Describe a situation where an analytical query or ML inference job was running too slowly. How did you diagnose the bottleneck and optimize it?`,
+            category: "problem-solving",
+            difficulty: req.difficulty,
+            contextHint: "Discuss partitioning, query execution plans, vectorization, and batching.",
+            expectedTopics: ["Query Optimization", "Partitioning", "Execution Plans"],
+          },
+          {
+            id: `q_data_${Date.now()}_4`,
+            order: 4,
+            question: `Tell me about a time when business stakeholders misunderstood your data insights or metrics, and how you communicated technical findings to non-technical leaders.`,
+            category: "behavioral",
+            difficulty: req.difficulty,
+            contextHint: "Use the STAR method.",
+            expectedTopics: ["Data Storytelling", "Stakeholder Alignment", "STAR Method"],
+          },
+          {
+            id: `q_data_${Date.now()}_5`,
+            order: 5,
+            question: `How would you design a real-time event analytics platform that ingests billions of clickstream events per day with sub-second query latency?`,
+            category: "system-design",
+            difficulty: req.difficulty,
+            contextHint: "Discuss Kafka/Pulsar, ClickHouse/Apache Pinot, column-oriented storage, and caching.",
+            expectedTopics: ["Kafka", "ClickHouse", "Columnar Storage", "Real-Time Aggregations"],
+          }
+        );
+      } else {
+        // Generic Software Engineering
+        questions.push(
+          {
+            id: `q_gen_${Date.now()}_1`,
+            order: 1,
+            question: `Welcome! To start off, could you introduce yourself and tell me about the most impactful software system or application you have built for ${role}?`,
+            category: "introductory",
+            difficulty: req.difficulty,
+            contextHint: "Explain your role, technical architecture, stack choices, and measurable results.",
+            expectedTopics: ["System Overview", "Ownership", "Technical Stack"],
+          },
+          {
+            id: `q_gen_${Date.now()}_2`,
+            order: 2,
+            question: `What are the core technical trade-offs you evaluate when selecting technologies, frameworks, and architecture patterns for ${role}?`,
+            category: "technical",
+            difficulty: req.difficulty,
+            contextHint: "Discuss maintainability, execution performance, security, and developer velocity.",
+            expectedTopics: ["Design Trade-offs", "Scalability", "Maintainability"],
+          },
+          {
+            id: `q_gen_${Date.now()}_3`,
+            order: 3,
+            question: `Walk me through a difficult technical bug or unexpected edge-case failure you diagnosed in production. What was your investigation process?`,
+            category: "problem-solving",
+            difficulty: req.difficulty,
+            contextHint: "Walk through reproduction, log analysis, root cause, and unit/integration regression tests.",
+            expectedTopics: ["Debugging Process", "Root Cause Analysis", "Testing Strategy"],
+          },
+          {
+            id: `q_gen_${Date.now()}_4`,
+            order: 4,
+            question: `Tell me about a time when you received constructive feedback on your code or architecture during a peer review. How did you handle it?`,
+            category: "behavioral",
+            difficulty: req.difficulty,
+            contextHint: "Use the STAR method: Situation, Task, Action, Result.",
+            expectedTopics: ["Feedback Receptivity", "Code Review", "STAR Method"],
+          },
+          {
+            id: `q_gen_${Date.now()}_5`,
+            order: 5,
+            question: `How would you architect a fault-tolerant notification or webhook delivery service that guarantees at-least-once delivery with exponential retry backoff?`,
+            category: "system-design",
+            difficulty: req.difficulty,
+            contextHint: "Discuss message queues, idempotent consumers, dead-letter queues, and jittered backoff.",
+            expectedTopics: ["Idempotency", "Message Queues", "Exponential Backoff", "Dead-Letter Queues"],
+          }
+        );
+      }
     }
 
-    let selected = [...questionBank];
+    // Ensure we return the requested count
+    let selected = [...questions];
     while (selected.length < req.count) {
       const idx = selected.length + 1;
       selected.push({
         id: `q_extra_${Date.now()}_${idx}`,
         order: idx,
-        question: `How do you approach debugging, monitoring, and telemetry when unexpected errors occur in production?`,
-        category: "problem-solving",
+        question: `How do you ensure zero-downtime deployments, database schema migrations, and canary releases in production systems?`,
+        category: "system-design",
         difficulty: req.difficulty,
-        contextHint: "Mention telemetry, logging, metrics, and incident runbooks.",
+        contextHint: "Discuss blue-green deployments, backward-compatible migrations, and feature flags.",
+        expectedTopics: ["Zero-Downtime Deployments", "Schema Migrations", "Feature Flags"],
       });
     }
 
@@ -152,7 +359,6 @@ export class MockAIService implements AIService {
     const wordCount = words.length;
     const lower = text.toLowerCase();
 
-    // Check for "I don't know" or zero-effort answers
     const isUnknown =
       /^(i don'?t know|no idea|i am not sure|idk|pass|don'?t know|nothing|na|none|skip)\.?$/i.test(text) ||
       wordCount < 4;
@@ -179,7 +385,6 @@ export class MockAIService implements AIService {
       };
     }
 
-    // Very short answers (< 15 words)
     if (wordCount < 15) {
       return {
         evaluation: {
@@ -202,20 +407,19 @@ export class MockAIService implements AIService {
       };
     }
 
-    // Medium answers (15 - 55 words)
     if (wordCount < 55) {
       const hasTechTerms = /(api|database|react|cache|state|service|latency|scaling|sql|async|component|schema|git|ci\/cd|pipeline)/i.test(lower);
-      const score = hasTechTerms ? 7.2 : 6.0;
+      const score = hasTechTerms ? 7.5 : 6.2;
 
       return {
         evaluation: {
           questionId: req.question.id,
           score,
-          communicationScore: hasTechTerms ? 7.5 : 6.5,
-          technicalScore: hasTechTerms ? 7.0 : 5.5,
-          relevanceScore: 7.5,
-          clarityScore: 7.0,
-          confidenceScore: 6.8,
+          communicationScore: hasTechTerms ? 7.8 : 6.8,
+          technicalScore: hasTechTerms ? 7.5 : 5.8,
+          relevanceScore: 7.8,
+          clarityScore: 7.2,
+          confidenceScore: 7.0,
           feedback: `Solid answer explaining the core concept. To reach the top percentile, elaborate further on the trade-offs you evaluated and the specific metrics or constraints you operated under.`,
           whatWasGood: [
             "Good articulation of foundational concepts",
@@ -230,7 +434,6 @@ export class MockAIService implements AIService {
       };
     }
 
-    // In-depth answers (55+ words)
     return {
       evaluation: {
         questionId: req.question.id,
@@ -302,11 +505,9 @@ export class MockAIService implements AIService {
     const clarAvg = Number((totalClar / divisor).toFixed(1));
     const confAvg = Number((totalConf / divisor).toFixed(1));
 
-    // Dynamic overall score calculation from 0 to 100
     const rawOverall = Math.round(((commAvg + techAvg + relAvg + clarAvg + confAvg) / 5) * 10);
     const overallScore = Math.min(100, Math.max(12, rawOverall));
 
-    // Dynamic synthesis based on actual candidate score
     let executiveSummary = "";
     let strengths: string[] = [];
     let areasToImprove: string[] = [];

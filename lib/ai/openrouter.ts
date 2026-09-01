@@ -55,8 +55,8 @@ export class OpenRouterAIService implements AIService {
   private async callOpenRouter(
     systemInstruction: string,
     promptText: string,
-    maxTokens: number = 1000,
-    timeoutMs: number = 2500 // Fast aggressive timeout
+    maxTokens: number = 1200,
+    timeoutMs: number = 7500
   ): Promise<any> {
     const url = `${this.baseUrl}/chat/completions`;
     const controller = new AbortController();
@@ -69,7 +69,7 @@ export class OpenRouterAIService implements AIService {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
-          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://interview-ai-five-weld.vercel.app",
           "X-Title": "InterviewAI",
         },
         body: JSON.stringify({
@@ -85,7 +85,7 @@ export class OpenRouterAIService implements AIService {
               content: promptText,
             },
           ],
-          temperature: 0.2,
+          temperature: 0.3,
         }),
       });
 
@@ -107,34 +107,34 @@ export class OpenRouterAIService implements AIService {
   }
 
   async generateQuestions(req: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
-    // Race OpenRouter with instant personalized plan for sub-second startup
-    const openRouterPromise = (async () => {
+    try {
       const prompt = createQuestionsPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 1200, 2000);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 1400, 7500);
+
       if (parsed?.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-        return { questions: parsed.questions };
+        return {
+          questions: parsed.questions.map((q: any, idx: number) => ({
+            id: q.id || `q_${Date.now()}_${idx + 1}`,
+            order: idx + 1,
+            question: q.question,
+            category: q.category || "technical",
+            difficulty: req.difficulty,
+            contextHint: q.contextHint || `Focus on ${req.role} principles and practical experience.`,
+            expectedTopics: q.expectedTopics || [],
+          })),
+        };
       }
       throw new Error("Invalid questions schema from OpenRouter");
-    })();
-
-    const fallbackPromise = this.fallbackService.generateQuestions(req);
-
-    try {
-      return await Promise.race([
-        openRouterPromise,
-        new Promise<GenerateQuestionsResponse>((_, reject) =>
-          setTimeout(() => reject(new Error("Fast timeout")), 1800)
-        ),
-      ]);
-    } catch {
-      return fallbackPromise;
+    } catch (err) {
+      console.warn("OpenRouter question generation fallback triggered:", err);
+      return this.fallbackService.generateQuestions(req);
     }
   }
 
   async evaluateAnswer(req: EvaluateAnswerRequest): Promise<EvaluateAnswerResponse> {
     try {
       const prompt = createEvaluationPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 800, 2500);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 800, 3500);
 
       if (parsed?.evaluation) {
         let followUpQuestion = undefined;
@@ -159,10 +159,9 @@ export class OpenRouterAIService implements AIService {
   }
 
   async generateScorecard(req: GenerateScorecardRequest): Promise<GenerateScorecardResponse> {
-    // Scorecard generation uses instant synthesized metrics with LLM enhancement
     try {
       const prompt = createScorecardPrompt(req);
-      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 1200, 2000);
+      const parsed = await this.callOpenRouter(INTERVIEWER_SYSTEM_PROMPT, prompt, 1200, 4500);
 
       if (parsed?.scorecard) {
         return { scorecard: parsed.scorecard };
