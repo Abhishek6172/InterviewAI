@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { SessionManager } from "@/lib/interview/session-manager";
-import { AnalyticsTracker } from "@/lib/analytics/tracker";
+import { InterviewSession } from "@/types/interview";
 import {
   User,
   Mail,
@@ -21,20 +21,41 @@ import {
   TrendingUp,
   Target,
   ArrowRight,
+  Trash2,
+  BarChart3,
+  FileCheck,
+  Clock,
 } from "lucide-react";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
-  const [interviewHistory, setInterviewHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<InterviewSession[]>([]);
   const [imageError, setImageError] = useState(false);
 
+  const loadHistory = () => {
+    const pastSessions = SessionManager.getSessionHistory();
+    setHistory(pastSessions);
+  };
+
   useEffect(() => {
-    // Load local practice sessions
-    const active = SessionManager.getActiveSession();
-    if (active) {
-      setInterviewHistory([active]);
-    }
+    loadHistory();
   }, []);
+
+  const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Are you sure you want to remove this interview session from your history?")) {
+      SessionManager.deleteSessionFromHistory(sessionId);
+      loadHistory();
+    }
+  };
+
+  const handleClearAllHistory = () => {
+    if (confirm("Are you sure you want to clear all your interview history and scores? This cannot be undone.")) {
+      SessionManager.clearAllHistory();
+      loadHistory();
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -51,9 +72,9 @@ export default function ProfilePage() {
           <User className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Sign in to your Profile</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Sign in to View Your Profile</h1>
           <p className="text-sm text-slate-400">
-            Sign in with Google to sync your mock interview scorecards, track performance metrics, and prefill candidate applications.
+            Sign in with Google to sync your mock interview scorecards, track performance history, and review past AI evaluations.
           </p>
         </div>
         <Button
@@ -88,18 +109,19 @@ export default function ProfilePage() {
   }
 
   const user = session.user;
-  const activeSession = interviewHistory[0];
-  const lastScore = activeSession?.scorecard?.overallScore || 0;
 
-  // Safe date formatter
-  const formattedDate =
-    activeSession?.createdAt && !isNaN(new Date(activeSession.createdAt).getTime())
-      ? new Date(activeSession.createdAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "Today";
+  // Compute aggregated performance statistics
+  const totalInterviews = history.length;
+  const scoredSessions = history.filter((s) => s.scorecard?.overallScore !== undefined);
+  const totalQuestions = history.reduce((acc, s) => acc + (s.questions?.length || 0), 0);
+
+  const averageScore = scoredSessions.length > 0
+    ? Math.round(scoredSessions.reduce((acc, s) => acc + (s.scorecard?.overallScore || 0), 0) / scoredSessions.length)
+    : 0;
+
+  const highestScore = scoredSessions.length > 0
+    ? Math.max(...scoredSessions.map((s) => s.scorecard?.overallScore || 0))
+    : 0;
 
   const initials = user.name
     ? user.name
@@ -111,7 +133,7 @@ export default function ProfilePage() {
     : "CA";
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-8 sm:py-12 space-y-8">
+    <div className="w-full max-w-5xl mx-auto px-4 py-8 sm:py-12 space-y-8">
       {/* Profile Header Card */}
       <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -137,13 +159,13 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">{user.name}</h1>
                 <Badge variant="success" className="text-[10px] gap-1 py-0.5">
-                  <ShieldCheck className="w-3 h-3" /> Verified
+                  <ShieldCheck className="w-3 h-3" /> Google Verified
                 </Badge>
               </div>
               <p className="text-xs sm:text-sm text-slate-400 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-purple-400" /> {user.email}
               </p>
-              <p className="text-[11px] text-slate-500">Google OAuth Account</p>
+              <p className="text-[11px] text-slate-500">InterviewAI Candidate Profile</p>
             </div>
           </div>
 
@@ -151,7 +173,7 @@ export default function ProfilePage() {
             <Link href="/interview/setup">
               <Button variant="glow" size="sm" className="gap-2 text-xs">
                 <RotateCcw className="w-3.5 h-3.5" />
-                Practice Interview
+                Practice New Interview
               </Button>
             </Link>
             <Button
@@ -167,87 +189,185 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Overview Metric Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 4 Aggregate Metric Statistics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* Total Interviews */}
         <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Recent Mock Score</span>
-            <Award className="w-4 h-4 text-purple-400" />
+            <span>Interviews Taken</span>
+            <FileCheck className="w-4 h-4 text-purple-400" />
           </div>
           <p className="text-2xl sm:text-3xl font-extrabold text-white">
-            {lastScore > 0 ? `${lastScore}/100` : "Ready"}
+            {totalInterviews}
           </p>
-          <p className="text-[11px] text-slate-500">
-            {lastScore > 0 ? "Latest session performance" : "Start a session to calculate score"}
-          </p>
+          <p className="text-[11px] text-slate-500">Total practice rounds</p>
         </div>
 
+        {/* Average Score */}
         <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Target Role</span>
-            <Target className="w-4 h-4 text-blue-400" />
+            <span>Average Score</span>
+            <Award className="w-4 h-4 text-blue-400" />
           </div>
-          <p className="text-base sm:text-lg font-bold text-white truncate">
-            {activeSession?.options?.role || "Software Engineer"}
+          <p className="text-2xl sm:text-3xl font-extrabold text-white">
+            {averageScore > 0 ? `${averageScore}/100` : "—"}
           </p>
-          <p className="text-[11px] text-slate-500">
-            {activeSession?.options?.difficulty || "Medium"} &bull; {activeSession?.options?.experienceLevel || "Fresher"}
-          </p>
+          <p className="text-[11px] text-slate-500">Across all completed sessions</p>
         </div>
 
+        {/* Top Score */}
         <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>AI Interviewer</span>
+            <span>Highest Score</span>
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
+            {highestScore > 0 ? `${highestScore}/100` : "—"}
+          </p>
+          <p className="text-[11px] text-slate-500">Personal best performance</p>
+        </div>
+
+        {/* Total Questions Answered */}
+        <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Questions Practiced</span>
             <Sparkles className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-base sm:text-lg font-bold text-white">Sara AI</p>
-          <p className="text-[11px] text-slate-500">Real-time voice & scorecard</p>
+          <p className="text-2xl sm:text-3xl font-extrabold text-white">
+            {totalQuestions}
+          </p>
+          <p className="text-[11px] text-slate-500">Interactive questions</p>
         </div>
       </div>
 
-      {/* Recent Session / Scorecard */}
+      {/* Complete Interview History List */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-purple-400" />
-          Recent Practice Sessions
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-purple-400" />
+            Saved Interview History & Past Scores
+          </h2>
 
-        {activeSession ? (
-          <Card className="glass-panel border-white/10 p-5 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                    {activeSession.options.role}
-                  </span>
-                  <Badge variant="outline" className="text-[10px] capitalize">
-                    {activeSession.options.difficulty}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-400">
-                  {activeSession.questions.length} questions &bull; Completed {formattedDate}
-                </p>
-              </div>
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAllHistory}
+              className="text-xs text-slate-400 hover:text-rose-400 transition-colors flex items-center gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Clear All History
+            </button>
+          )}
+        </div>
 
-              <div className="flex items-center gap-3">
-                {activeSession.scorecard && (
-                  <span className="text-sm font-extrabold px-3 py-1.5 rounded-xl bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                    {activeSession.scorecard.overallScore}/100
-                  </span>
-                )}
-                <Link href="/interview/results">
-                  <Button variant="glow" size="sm" className="text-xs gap-1.5">
-                    View Scorecard <ArrowRight className="w-3 h-3" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
+        {history.length > 0 ? (
+          <div className="space-y-3">
+            {history.map((item, idx) => {
+              const score = item.scorecard?.overallScore;
+              const dateStr = item.createdAt && !isNaN(new Date(item.createdAt).getTime())
+                ? new Date(item.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Recent Session";
+
+              // Color code score badge
+              let scoreColor = "bg-purple-500/15 text-purple-300 border-purple-500/30";
+              if (score !== undefined) {
+                if (score >= 80) scoreColor = "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+                else if (score >= 60) scoreColor = "bg-blue-500/15 text-blue-300 border-blue-500/30";
+                else scoreColor = "bg-amber-500/15 text-amber-300 border-amber-500/30";
+              }
+
+              return (
+                <Card
+                  key={item.id || idx}
+                  className="glass-panel border-white/10 p-5 hover:border-white/20 transition-all overflow-hidden"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-bold text-white uppercase tracking-wider">
+                          {item.options.role}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {item.options.difficulty}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] text-slate-400">
+                          {item.options.experienceLevel || "Fresher"}
+                        </Badge>
+                        {item.options.resumeFileName && (
+                          <Badge variant="purple" className="text-[10px] text-purple-300">
+                            📄 Resume Probed
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                          {dateStr}
+                        </span>
+                        <span>&bull;</span>
+                        <span>{item.questions.length} Questions Answered</span>
+                        {item.status && (
+                          <>
+                            <span>&bull;</span>
+                            <span className="capitalize text-slate-300 font-medium">{item.status}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      {score !== undefined ? (
+                        <div className={`px-3.5 py-1.5 rounded-xl border text-sm font-extrabold flex items-center gap-1.5 ${scoreColor}`}>
+                          <Award className="w-4 h-4" />
+                          <span>{score}/100</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">In Progress</span>
+                      )}
+
+                      <Link href={`/interview/results?sessionId=${item.id}`}>
+                        <Button variant="glow" size="sm" className="text-xs gap-1.5 h-9">
+                          View Scorecard
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Button>
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSession(item.id, e)}
+                        title="Delete this session"
+                        className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
         ) : (
-          <Card className="glass-panel border-white/10 p-8 text-center space-y-3">
-            <p className="text-sm text-slate-400">No mock interview sessions recorded yet.</p>
+          <Card className="glass-panel border-white/10 p-10 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 mx-auto flex items-center justify-center">
+              <Award className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">No Interview History Saved Yet</h3>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+                Complete your first practice session with Sara to track your overall scores, 5-dimensional breakdown, and improvement tips over time.
+              </p>
+            </div>
             <Link href="/interview/setup">
-              <Button variant="glow" size="sm">Start Your First Interview with Sara</Button>
+              <Button variant="glow" size="sm" className="gap-2">
+                Start Your First Mock Interview
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
             </Link>
           </Card>
         )}

@@ -8,6 +8,7 @@ import {
 } from "@/types/interview";
 
 const ACTIVE_SESSION_KEY = "interviewai_active_session";
+const HISTORY_KEY = "interviewai_session_history";
 
 export class SessionManager {
   public static createSession(
@@ -23,6 +24,7 @@ export class SessionManager {
       answers: {},
       evaluations: {},
       startedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     };
 
     this.saveSession(session);
@@ -115,7 +117,78 @@ export class SessionManager {
     session.completedAt = new Date().toISOString();
 
     this.saveSession(session);
+    this.saveToHistory(session);
     return session;
+  }
+
+  // --- Session History Storage ---
+
+  public static getSessionHistory(): InterviewSession[] {
+    if (typeof window === "undefined") return [];
+    try {
+      const data = localStorage.getItem(HISTORY_KEY);
+      if (!data) {
+        // If history is empty but there's a completed active session, seed it
+        const active = this.getActiveSession();
+        if (active && active.status === "completed" && active.scorecard) {
+          return [active];
+        }
+        return [];
+      }
+      const parsed: InterviewSession[] = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public static saveToHistory(session: InterviewSession): void {
+    if (typeof window === "undefined") return;
+    try {
+      const history = this.getSessionHistory();
+      const existingIndex = history.findIndex((s) => s.id === session.id);
+      if (existingIndex >= 0) {
+        history[existingIndex] = session;
+      } else {
+        history.unshift(session);
+      }
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch (err) {
+      console.warn("Error saving session to history:", err);
+    }
+  }
+
+  public static getSessionById(sessionId: string): InterviewSession | null {
+    const active = this.getActiveSession();
+    if (active && active.id === sessionId) return active;
+
+    const history = this.getSessionHistory();
+    return history.find((s) => s.id === sessionId) || null;
+  }
+
+  public static deleteSessionFromHistory(sessionId: string): void {
+    if (typeof window === "undefined") return;
+    try {
+      const history = this.getSessionHistory().filter((s) => s.id !== sessionId);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+
+      const active = this.getActiveSession();
+      if (active && active.id === sessionId) {
+        this.clearSession();
+      }
+    } catch (err) {
+      console.warn("Error deleting session from history:", err);
+    }
+  }
+
+  public static clearAllHistory(): void {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+      localStorage.removeItem(ACTIVE_SESSION_KEY);
+    } catch {
+      // ignore
+    }
   }
 
   public static clearSession(): void {

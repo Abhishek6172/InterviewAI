@@ -98,4 +98,5 @@ export interface InterviewSession {
   scorecard?: InterviewScorecard;
   startedAt: string;
   completedAt?: string;
+  createdAt?: string;
 }

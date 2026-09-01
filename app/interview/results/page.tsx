@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -24,23 +24,37 @@ import {
   AlertCircle,
   MessageSquare,
   Star,
+  ArrowLeft,
 } from "lucide-react";
 
-export default function InterviewResultsPage() {
+function ResultsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const querySessionId = searchParams.get("sessionId");
+
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [showFloatingFeedbackPrompt, setShowFloatingFeedbackPrompt] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   useEffect(() => {
-    const active = SessionManager.getActiveSession();
-    if (!active) {
+    let targetSession: InterviewSession | null = null;
+
+    if (querySessionId) {
+      targetSession = SessionManager.getSessionById(querySessionId);
+    }
+
+    if (!targetSession) {
+      targetSession = SessionManager.getActiveSession();
+    }
+
+    if (!targetSession) {
       router.replace("/interview/setup");
       return;
     }
-    setSession(active);
-    AnalyticsTracker.track("results_viewed", {}, active.id);
+
+    setSession(targetSession);
+    AnalyticsTracker.track("results_viewed", {}, targetSession.id);
 
     // Scroll listener to show slide-up feedback prompt
     const handleScroll = () => {
@@ -53,7 +67,7 @@ export default function InterviewResultsPage() {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [router]);
+  }, [router, querySessionId]);
 
   const scrollToFeedback = () => {
     document.getElementById("feedback-form-section")?.scrollIntoView({ behavior: "smooth" });
@@ -274,5 +288,19 @@ export default function InterviewResultsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function InterviewResultsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full max-w-4xl mx-auto px-4 py-20 text-center">
+          <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin mx-auto" />
+        </div>
+      }
+    >
+      <ResultsContent />
+    </Suspense>
   );
 }
